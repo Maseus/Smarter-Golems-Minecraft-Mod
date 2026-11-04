@@ -33,7 +33,10 @@ public final class SmarterGolemsConfig {
 			try (Reader reader = Files.newBufferedReader(file)) {
 				loaded = GSON.fromJson(reader, SmarterGolemsConfig.class);
 			} catch (IOException | RuntimeException e) {
-				SmarterGolems.LOGGER.warn("Could not read {}, using defaults", file, e);
+				// Keep the player's file so they can fix the mistake; just run on defaults for now.
+				SmarterGolems.LOGGER.warn("Could not read {} (using defaults until it's fixed; the file was left unchanged)", file, e);
+				instance = new SmarterGolemsConfig();
+				return;
 			}
 		}
 		instance = loaded != null ? loaded : new SmarterGolemsConfig();

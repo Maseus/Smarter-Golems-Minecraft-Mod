@@ -30,11 +30,14 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Woodcutting: walk to the nearest tree in the area, chop for a while, then fell the whole
- * tree (logs and its natural leaves) into the bag and replant a sapling on the stump.
+ * tree (logs and the natural leaves that would decay without it) into the bag and replant a
+ * sapling on the stump. Neighboring trees keep their canopies.
  *
- * <p>To never cut down a player's build, something only counts as a tree when:
- * it has natural (non-player-placed) leaves attached, it has no stripped logs, and its base
- * is at most a 2x2 trunk standing on dirt/grass. A log wall would have a much wider base.
+ * <p>To leave player builds alone, something only counts as a tree when: it has natural
+ * (non-player-placed) leaves attached, it has no stripped logs, and its base is at most a 2x2
+ * trunk standing on dirt/grass. A free-standing log wall would have a much wider base.
+ * Limitation: logs touching a tree (even diagonally) count as part of it, so builds that
+ * touch trees inside the work area can be cut.
  */
 public class WoodcuttingWorker extends TaskWorker {
 	private static final double TREE_REACH = 2.0;
@@ -47,6 +50,8 @@ public class WoodcuttingWorker extends TaskWorker {
 	private static final int MAX_LOGS = 200;
 	private static final int MAX_LEAVES = 1000;
 	private static final int MIN_LEAVES = 4;
+	/** Leaves this many blocks or fewer (through leaves) from a log don't decay (vanilla: 6). */
+	private static final int LEAF_SUPPORT_DISTANCE = 6;
 	/** Largest trunk base: 2x2 (dark oak, big spruce, big jungle). */
 	private static final int MAX_STUMPS = 4;
 	/** Things that look like trees but aren't (e.g. a log pillar) are skipped for a long while. */
@@ -147,9 +152,13 @@ public class WoodcuttingWorker extends TaskWorker {
 			level.destroyBlock(pos, false, golem);
 		}
 		damageTool(golem, tree.logs().size()); // like a player: one durability per log
+		// Only the leaves that would now decay: a neighboring tree's canopy is still held by its own logs.
+		Set<BlockPos> supported = stillSupported(level, tree.leaves());
 		for (BlockPos pos : tree.leaves()) {
-			collectDrops(level, golem, pos);
-			level.removeBlock(pos, false);
+			if (!supported.contains(pos)) {
+				collectDrops(level, golem, pos);
+				level.removeBlock(pos, false);
+			}
 		}
 		for (BlockPos stump : tree.stumps()) {
 			replant(level, golem, stump, logId);
@@ -249,6 +258,44 @@ public class WoodcuttingWorker extends TaskWorker {
 			return null; // no natural leaves: not a tree
 		}
 		return new Tree(logs, leaves, stumps);
+	}
+
+	/**
+	 * Of the given leaves, those still within {@link #LEAF_SUPPORT_DISTANCE} blocks (through leaves)
+	 * of a log, the same rule vanilla uses to decide which leaves decay. Call after removing a tree's
+	 * logs: what remains supported belongs to other trees.
+	 */
+	private static Set<BlockPos> stillSupported(ServerLevel level, List<BlockPos> leaves) {
+		Set<BlockPos> candidates = new HashSet<>(leaves);
+		Set<BlockPos> supported = new HashSet<>();
+		ArrayDeque<BlockPos> queue = new ArrayDeque<>();
+		java.util.Map<BlockPos, Integer> distance = new java.util.HashMap<>();
+		for (BlockPos leaf : leaves) {
+			for (Direction dir : Direction.values()) {
+				if (level.getBlockState(leaf.relative(dir)).is(BlockTags.LOGS)) {
+					distance.put(leaf, 1);
+					supported.add(leaf);
+					queue.add(leaf);
+					break;
+				}
+			}
+		}
+		while (!queue.isEmpty()) {
+			BlockPos pos = queue.poll();
+			int next = distance.get(pos) + 1;
+			if (next > LEAF_SUPPORT_DISTANCE) {
+				continue;
+			}
+			for (Direction dir : Direction.values()) {
+				BlockPos neighbor = pos.relative(dir);
+				if (candidates.contains(neighbor) && !supported.contains(neighbor)) {
+					distance.put(neighbor, next);
+					supported.add(neighbor);
+					queue.add(neighbor);
+				}
+			}
+		}
+		return supported;
 	}
 
 	private static boolean isStripped(BlockState state) {

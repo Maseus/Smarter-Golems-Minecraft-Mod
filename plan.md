@@ -19,7 +19,9 @@ Copper golems are built the vanilla way (carved pumpkin on a copper block).
 ## Task: Woodcutting
 - Finds the nearest tree in the area, chops for ~3s, then fells the whole tree (logs + natural leaves) into its bag.
 - Replants a matching sapling on the stump (oak_log → oak_sapling, else any sapling); keeps up to 16 saplings per kind for this.
-- Never cuts builds: a "tree" must have natural (non-persistent) leaves, no stripped logs, and a base of at most a 2x2 trunk on dirt/grass.
+- Leaves builds alone: a "tree" must have natural (non-persistent) leaves, no stripped logs, and a base of at most a 2x2 trunk on dirt/grass.
+- Logs touching a tree count as part of it (documented limitation; keep builds out of the area).
+- Felling removes only the leaves that would decay (vanilla rule: more than 6 leaf-steps from any log), so neighboring trees keep their canopies.
 - Pushes through natural leaves blocking its way (breaks them like a ravager, keeps the drops); player-placed leaves are never broken.
 
 ## Task: Collecting

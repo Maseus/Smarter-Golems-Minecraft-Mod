@@ -101,6 +101,48 @@ public class WoodcuttingGameTest {
 		});
 	}
 
+	/** Felling a tree in a forest leaves the canopy of a neighboring tree alone, even where the leaves touch. */
+	@GameTest(maxTicks = 1200, padding = TestUtil.PADDING)
+	public void leavesNeighborCanopy(GameTestHelper helper) {
+		buildFloor(helper);
+		BlockState leaves = naturalLeaves();
+		// Tree A on dirt (the golem fells it) and tree B on stone (never a target), canopies touching at x=3/4.
+		BlockPos treeA = new BlockPos(2, 1, 4);
+		BlockPos treeB = new BlockPos(5, 1, 4);
+		helper.setBlock(treeB.below(), Blocks.STONE);
+		for (BlockPos trunk : new BlockPos[] {treeA, treeB}) {
+			for (int y = 0; y < TRUNK_HEIGHT; y++) {
+				helper.setBlock(trunk.above(y), Blocks.OAK_LOG);
+			}
+			for (int y = TRUNK_HEIGHT - 2; y < TRUNK_HEIGHT; y++) {
+				for (int dx = -1; dx <= 1; dx++) {
+					for (int dz = -1; dz <= 1; dz++) {
+						if (dx != 0 || dz != 0) {
+							helper.setBlock(trunk.offset(dx, y, dz), leaves);
+						}
+					}
+				}
+			}
+		}
+		CopperGolem golem = helper.spawn(EntityTypes.COPPER_GOLEM, new BlockPos(1, 1, 1));
+		GolemTasks.set(golem, new GolemTask(GolemTaskType.WOODCUTTING, golem.blockPosition()));
+		GolemInventory.get(golem).addItem(new ItemStack(Items.OAK_SAPLING));
+
+		helper.succeedWhen(() -> {
+			helper.assertBlockPresent(Blocks.OAK_SAPLING, treeA);
+			for (int y = 1; y < TRUNK_HEIGHT; y++) {
+				helper.assertBlockPresent(Blocks.AIR, treeA.above(y));
+			}
+			// (A's leaves within reach of B's trunk stay too, exactly like vanilla leaf decay.)
+			for (int y = TRUNK_HEIGHT - 2; y < TRUNK_HEIGHT; y++) {
+				for (int dz = -1; dz <= 1; dz++) {
+					// B's leaves on the side touching A must all still be there.
+					helper.assertBlockPresent(Blocks.OAK_LEAVES, treeB.offset(-1, y, dz));
+				}
+			}
+		});
+	}
+
 	/** Logs without natural leaves (like a player's house) are never cut. */
 	@GameTest(maxTicks = 400, padding = TestUtil.PADDING)
 	public void leavesBuildsAlone(GameTestHelper helper) {

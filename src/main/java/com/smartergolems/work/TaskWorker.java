@@ -415,7 +415,7 @@ public abstract class TaskWorker {
 		golem.setState(CopperGolemState.DROPPING_ITEM);
 
 		boolean chestFull = deposit(golem, chest);
-		restock(golem, chest);
+		restock(level, golem, chest);
 		chest.setChanged();
 		if (chestFull) {
 			skip(level, chestPos); // try a different chest for a while
@@ -447,7 +447,7 @@ public abstract class TaskWorker {
 	}
 
 	/** Takes a tool (if the golem has none) and bone meal (up to the kept amount) from the chest. */
-	private void restock(CopperGolem golem, Container chest) {
+	private void restock(ServerLevel level, CopperGolem golem, Container chest) {
 		if (tool(golem).isEmpty()) {
 			for (int i = 0; i < chest.getContainerSize(); i++) {
 				ItemStack stack = chest.getItem(i);
@@ -455,10 +455,10 @@ public abstract class TaskWorker {
 					ItemStack held = golem.getMainHandItem();
 					golem.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, stack.split(1));
 					if (!held.isEmpty()) {
-						// Whatever it was holding goes into the chest (or back to the bag if full).
+						// Whatever it was holding goes into the chest, else the bag, else the ground.
 						ItemStack remainder = HopperBlockEntity.addItem(null, chest, held, null);
 						if (!remainder.isEmpty()) {
-							GolemInventory.get(golem).addItem(remainder);
+							GolemInventory.addOrDrop(golem, level, remainder);
 						}
 					}
 					break;

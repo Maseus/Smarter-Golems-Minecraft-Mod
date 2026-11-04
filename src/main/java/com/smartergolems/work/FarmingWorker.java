@@ -174,9 +174,11 @@ public class FarmingWorker extends TaskWorker {
 	private static void harvestAndReplant(ServerLevel level, CopperGolem golem, BlockPos pos, BlockState state, Item seed, BlockState planted) {
 		List<ItemStack> drops = Block.getDrops(state, level, pos, null, golem, ItemStack.EMPTY);
 		level.destroyBlock(pos, false, golem);
+		// If the soil is gone (e.g. trampled farmland), keep every seed instead of losing one.
+		boolean canReplant = planted.canSurvive(level, pos);
 		boolean replanted = false;
 		for (ItemStack drop : drops) {
-			if (!replanted && drop.is(seed)) {
+			if (canReplant && !replanted && drop.is(seed)) {
 				drop.shrink(1);
 				replanted = place(level, golem, pos, planted);
 			}
@@ -186,7 +188,7 @@ public class FarmingWorker extends TaskWorker {
 				GolemInventory.addOrDrop(golem, level, drop);
 			}
 		}
-		if (!replanted && planted.canSurvive(level, pos) && takeFromBag(golem, seed)) {
+		if (canReplant && !replanted && takeFromBag(golem, seed)) {
 			place(level, golem, pos, planted);
 		}
 	}

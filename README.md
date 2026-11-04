@@ -29,14 +29,15 @@ Choose **No task** to give a golem its vanilla behavior back. Anything still in 
 - **With bone meal:** helps growing crops along.
 
 ### Woodcutting
-- Chops the nearest tree, fells the whole thing (logs and leaves) and replants a matching sapling.
+- Chops the nearest tree, fells the whole thing (logs and leaves) and replants a matching sapling. In a forest, neighboring trees keep their leaves.
 - **With an axe:** chops faster. A better axe means faster chopping.
 - **With bone meal:** grows saplings.
 - Pushes through natural leaves to reach trunks.
-- **Never cuts your builds.** Something only counts as a tree if all of these are true:
+- **Leaves log builds alone.** Something only counts as a tree if all of these are true:
   - it has natural leaves attached (leaves you place yourself don't count)
   - it has no stripped logs
   - its base is at most a 2x2 trunk standing on dirt or grass
+- ⚠️ Logs that **touch** a tree count as part of it, so keep log builds out of a woodcutter's area, or at least not touching any trees.
 
 ### Collecting
 - Picks up items lying on the ground in its area, such as under a mob farm, and puts them in the chest.
