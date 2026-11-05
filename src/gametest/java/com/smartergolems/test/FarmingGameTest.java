@@ -21,7 +21,7 @@ public class FarmingGameTest {
 	private static final BlockPos GOLEM = new BlockPos(3, 1, 3);
 
 	/** A farming golem harvests ripe wheat, replants it, and deposits the harvest into a chest. */
-	@GameTest(maxTicks = 1200)
+	@GameTest(maxTicks = 1200, padding = TestUtil.PADDING)
 	public void harvestsReplantsAndDeposits(GameTestHelper helper) {
 		buildFloor(helper);
 		for (BlockPos crop : CROPS) {
@@ -46,7 +46,7 @@ public class FarmingGameTest {
 	}
 
 	/** A golem with no task is left alone: ripe wheat is not touched. */
-	@GameTest(maxTicks = 200)
+	@GameTest(maxTicks = 200, padding = TestUtil.PADDING)
 	public void golemWithoutTaskDoesNotFarm(GameTestHelper helper) {
 		buildFloor(helper);
 		BlockPos crop = CROPS.get(1);

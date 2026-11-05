@@ -1,16 +1,17 @@
 package com.smartergolems.mixin;
 
-import com.smartergolems.farming.FarmingWorker;
 import com.smartergolems.golem.GolemInteraction;
 import com.smartergolems.golem.GolemInventory;
 import com.smartergolems.golem.WorkingGolem;
 import com.smartergolems.task.GolemTaskType;
 import com.smartergolems.task.GolemTasks;
+import com.smartergolems.work.TaskWorker;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.animal.golem.CopperGolem;
 import net.minecraft.world.entity.player.Player;
+import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -21,11 +22,24 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(CopperGolem.class)
 public abstract class CopperGolemMixin implements WorkingGolem {
 	@Unique
-	private final FarmingWorker smartergolems$farmingWorker = new FarmingWorker();
+	private @Nullable TaskWorker smartergolems$worker;
+	@Unique
+	private @Nullable GolemTaskType smartergolems$workerType;
 
 	@Override
-	public FarmingWorker smartergolems$getFarmingWorker() {
-		return smartergolems$farmingWorker;
+	public TaskWorker smartergolems$workerFor(GolemTaskType type) {
+		if (smartergolems$worker == null || smartergolems$workerType != type) {
+			smartergolems$worker = type.createWorker();
+			smartergolems$workerType = type;
+		}
+		return smartergolems$worker;
+	}
+
+	@Override
+	public void smartergolems$resetWorker(ServerLevel level) {
+		if (smartergolems$worker != null) {
+			smartergolems$worker.reset(level, (CopperGolem) (Object) this);
+		}
 	}
 
 	/**
@@ -45,10 +59,8 @@ public abstract class CopperGolemMixin implements WorkingGolem {
 	private void smartergolems$runTask(ServerLevel level, CallbackInfo ci) {
 		CopperGolem golem = (CopperGolem) (Object) this;
 		GolemTasks.get(golem).ifPresent(task -> {
-			if (task.type() == GolemTaskType.FARMING) {
-				smartergolems$farmingWorker.tick(level, golem, task);
-				ci.cancel();
-			}
+			smartergolems$workerFor(task.type()).tick(level, golem, task);
+			ci.cancel();
 		});
 	}
 

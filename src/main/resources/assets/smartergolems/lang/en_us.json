@@ -3,6 +3,7 @@
 	"screen.smartergolems.current": "Current task: %s",
 	"screen.smartergolems.area": "Work area: %sx%s (outlined)",
 	"task.smartergolems.farming": "Farming",
+	"task.smartergolems.woodcutting": "Woodcutting",
 	"task.smartergolems.none": "No task",
 	"message.smartergolems.task_set": "Task: %s (%sx%s around %s, %s, %s)",
 	"message.smartergolems.task_cleared": "Task cleared",

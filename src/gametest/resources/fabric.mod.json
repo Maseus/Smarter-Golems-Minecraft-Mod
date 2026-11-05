@@ -6,7 +6,8 @@
 	"environment": "*",
 	"entrypoints": {
 		"fabric-gametest": [
-			"com.smartergolems.test.FarmingGameTest"
+			"com.smartergolems.test.FarmingGameTest",
+			"com.smartergolems.test.WoodcuttingGameTest"
 		]
 	},
 	"depends": {

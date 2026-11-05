@@ -49,7 +49,7 @@ public final class GolemInteraction {
 	public static void applyTask(CopperGolem golem, ServerPlayer player, Optional<GolemTaskType> type) {
 		ServerLevel level = player.level();
 		// Stop whatever the golem was doing (vanilla chest sorting or a previous task) before switching.
-		((WorkingGolem) golem).smartergolems$getFarmingWorker().reset(level, golem);
+		((WorkingGolem) golem).smartergolems$resetWorker(level);
 		golem.getBrain().stopAll(level, golem);
 
 		if (type.isEmpty()) {
