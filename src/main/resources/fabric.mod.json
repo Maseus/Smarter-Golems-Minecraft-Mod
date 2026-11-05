@@ -7,6 +7,11 @@
 	"authors": [
 		"Maseus"
 	],
+	"contact": {
+		"homepage": "https://github.com/Maseus/Smarter-Golems-Minecraft-Mod",
+		"sources": "https://github.com/Maseus/Smarter-Golems-Minecraft-Mod",
+		"issues": "https://github.com/Maseus/Smarter-Golems-Minecraft-Mod/issues"
+	},
 	"license": "MIT",
 	"icon": "assets/smartergolems/icon.png",
 	"environment": "*",
