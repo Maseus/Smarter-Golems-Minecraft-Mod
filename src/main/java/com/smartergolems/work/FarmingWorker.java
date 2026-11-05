@@ -51,6 +51,11 @@ public class FarmingWorker extends TaskWorker {
 	}
 
 	@Override
+	protected boolean usesTool() {
+		return true;
+	}
+
+	@Override
 	protected boolean usesBoneMeal() {
 		return true;
 	}

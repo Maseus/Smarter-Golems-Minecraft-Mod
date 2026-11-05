@@ -1,5 +1,6 @@
 package com.smartergolems.client.screen;
 
+import com.smartergolems.golem.GolemInventory;
 import com.smartergolems.network.ModNetworking;
 import com.smartergolems.network.OpenTaskScreenPayload;
 import com.smartergolems.network.SetTaskPayload;
@@ -30,7 +31,7 @@ public class GolemTaskScreen extends Screen {
 	private static final int BUTTON_SPACING = 24;
 	private static final int LINE = 12;
 	private static final int SLOT = 18;
-	private static final int PANEL_WIDTH = 10 * SLOT + 24;
+	private static final int PANEL_WIDTH = (GolemInventory.SIZE + 1) * SLOT + 24;
 	private static final int PANEL_PADDING = 8;
 	private static final int PANEL_COLOR = 0xA0000000;
 	private static final int SLOT_COLOR = 0x80555555;
@@ -76,7 +77,7 @@ public class GolemTaskScreen extends Screen {
 	}
 
 	private int slotsLeft() {
-		return (this.width - 10 * SLOT - 6) / 2;
+		return (this.width - (GolemInventory.SIZE + 1) * SLOT - 6) / 2;
 	}
 
 	@Override
@@ -168,14 +169,14 @@ public class GolemTaskScreen extends Screen {
 			centerX, takeButtonTop() + BUTTON_HEIGHT + 6, TEXT_GRAY);
 	}
 
-	/** The tool slot (copper-tinted) followed by the 9 bag slots, with item tooltips on hover. */
+	/** The tool slot (copper-tinted) followed by the bag slots, with item tooltips on hover. */
 	private void extractSlots(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
 		int x = slotsLeft();
 		int y = slotsTop();
 		drawSlot(graphics, data.tool(), x, y, TOOL_SLOT_COLOR, mouseX, mouseY, Component.translatable("screen.smartergolems.tool_slot"));
 		x += SLOT + 6;
 		List<ItemStack> bag = data.bag();
-		for (int i = 0; i < 9; i++) {
+		for (int i = 0; i < GolemInventory.SIZE; i++) {
 			drawSlot(graphics, i < bag.size() ? bag.get(i) : ItemStack.EMPTY, x + i * SLOT, y, SLOT_COLOR, mouseX, mouseY, null);
 		}
 	}

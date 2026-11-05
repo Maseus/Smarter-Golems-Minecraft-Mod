@@ -62,18 +62,23 @@ public class WoodcuttingWorker extends TaskWorker {
 
 	@Override
 	protected Optional<Job> findWork(ServerLevel level, CopperGolem golem, GolemTask task) {
-		// Check candidates nearest first; anything that turns out not to be a tree is skipped for a while.
-		while (true) {
-			Optional<BlockPos> candidate = findNearest(golem, task.areaPositions(), pos -> isTrunkBase(level, pos));
-			if (candidate.isEmpty()) {
-				return fertilizeJob(level, golem, task);
+		// One scan of the area, then check candidates nearest first; anything that turns out
+		// not to be a tree (e.g. a log pillar) is skipped for a while.
+		List<BlockPos> candidates = new ArrayList<>();
+		for (BlockPos pos : task.areaPositions()) {
+			if (!isSkipped(pos) && isTrunkBase(level, pos)) {
+				candidates.add(pos.immutable());
 			}
-			BlockPos base = candidate.get();
+		}
+		BlockPos from = golem.blockPosition();
+		candidates.sort(java.util.Comparator.comparingDouble(pos -> pos.distSqr(from)));
+		for (BlockPos base : candidates) {
 			if (scanTree(level, base) != null) {
 				return Optional.of(chopJob(level, golem, base));
 			}
 			skip(level, base, NOT_A_TREE_COOLDOWN);
 		}
+		return fertilizeJob(level, golem, task);
 	}
 
 	/** With bone meal in the bag: help saplings in the area grow. */
@@ -101,6 +106,11 @@ public class WoodcuttingWorker extends TaskWorker {
 	@Override
 	public boolean wantsTool(ItemStack stack) {
 		return stack.is(ItemTags.AXES);
+	}
+
+	@Override
+	protected boolean usesTool() {
+		return true;
 	}
 
 	@Override

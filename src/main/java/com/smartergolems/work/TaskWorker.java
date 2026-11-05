@@ -3,7 +3,10 @@ package com.smartergolems.work;
 import com.smartergolems.golem.GolemInventory;
 import com.smartergolems.golem.GolemStatus;
 import com.smartergolems.task.GolemTask;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
@@ -108,6 +111,11 @@ public abstract class TaskWorker {
 		return false;
 	}
 
+	/** Whether this task uses a tool at all (if not, chests are never searched for one). */
+	protected boolean usesTool() {
+		return false;
+	}
+
 	/** Whether this task uses bone meal (kept in the bag and restocked from chests). */
 	protected boolean usesBoneMeal() {
 		return false;
@@ -169,18 +177,21 @@ public abstract class TaskWorker {
 		skipped.values().removeIf(until -> until <= now);
 
 		boolean canDeposit = hasItemsToDeposit(golem);
+		boolean needsSupplies = needsSupplies(golem);
+		// Look for chests at most once per check, and only if the golem has a reason to visit one.
+		List<BlockPos> chests = canDeposit || needsSupplies ? findChests(level, golem, task) : List.of();
 		Optional<Job> next = Optional.empty();
 		if (canDeposit && GolemInventory.usedSlots(golem) >= DEPOSIT_THRESHOLD_SLOTS) {
-			next = chestJob(level, golem, task, chest -> true);
+			next = chestJob(level, golem, chests, chest -> true);
 		}
 		if (next.isEmpty()) {
 			next = findWork(level, golem, task);
 		}
 		if (next.isEmpty() && canDeposit) {
-			next = chestJob(level, golem, task, chest -> true);
+			next = chestJob(level, golem, chests, chest -> true);
 		}
-		if (next.isEmpty()) {
-			next = chestJob(level, golem, task, chest -> hasNeededSupplies(golem, chest));
+		if (next.isEmpty() && needsSupplies) {
+			next = chestJob(level, golem, chests, chest -> hasNeededSupplies(golem, chest));
 		}
 		if (next.isPresent()) {
 			setPhase(Phase.MOVING, next.get());
@@ -210,7 +221,7 @@ public abstract class TaskWorker {
 			}
 			return;
 		}
-		if (ticksInPhase > GIVE_UP_TICKS) {
+		if (ticksInPhase > WorkSpeed.scaleTicks(golem, GIVE_UP_TICKS)) {
 			skip(level, target);
 			finishJob(golem, false);
 			return;
@@ -244,7 +255,7 @@ public abstract class TaskWorker {
 	}
 
 	private void tickReturning(CopperGolem golem) {
-		if (golem.getNavigation().isDone() || ticksInPhase > GIVE_UP_TICKS) {
+		if (golem.getNavigation().isDone() || ticksInPhase > WorkSpeed.scaleTicks(golem, GIVE_UP_TICKS)) {
 			golem.getNavigation().stop();
 			cooldown = WorkSpeed.scaleTicks(golem, IDLE_SCAN_COOLDOWN);
 			setPhase(Phase.IDLE, null);
@@ -370,17 +381,29 @@ public abstract class TaskWorker {
 
 	// ---- Chests: depositing and restocking ----
 
-	/** Walk to the nearest chest matching {@code wanted}, drop off items and pick up supplies. */
-	private Optional<Job> chestJob(ServerLevel level, CopperGolem golem, GolemTask task, Predicate<Container> wanted) {
+	/** Usable chests in and around the work area (not currently skipped), nearest first. */
+	private List<BlockPos> findChests(ServerLevel level, CopperGolem golem, GolemTask task) {
 		BlockPos anchor = task.anchor();
 		int radius = GolemTask.horizontalRadius() + CHEST_SEARCH_EXTRA;
-		Iterable<BlockPos> positions = BlockPos.betweenClosed(
+		List<BlockPos> chests = new ArrayList<>();
+		for (BlockPos pos : BlockPos.betweenClosed(
 			anchor.offset(-radius, -GolemTask.VERTICAL_RADIUS, -radius),
-			anchor.offset(radius, GolemTask.VERTICAL_RADIUS, radius));
-		return findNearest(golem, positions, pos -> {
+			anchor.offset(radius, GolemTask.VERTICAL_RADIUS, radius))) {
+			if (!skipped.containsKey(pos) && getChest(level, pos) != null) {
+				chests.add(pos.immutable());
+			}
+		}
+		BlockPos from = golem.blockPosition();
+		chests.sort(Comparator.comparingDouble(pos -> pos.distSqr(from)));
+		return chests;
+	}
+
+	/** Walk to the nearest of {@code chests} matching {@code wanted}, drop off items and pick up supplies. */
+	private Optional<Job> chestJob(ServerLevel level, CopperGolem golem, List<BlockPos> chests, Predicate<Container> wanted) {
+		return chests.stream().filter(pos -> {
 			Container chest = getChest(level, pos);
 			return chest != null && wanted.test(chest);
-		}).map(chestPos -> new Job(
+		}).findFirst().map(chestPos -> new Job(
 			Activity.DEPOSITING, chestPos, CHEST_REACH, DEPOSIT_DURATION,
 			() -> visitChest(level, golem, chestPos),
 			tick -> {
@@ -448,7 +471,7 @@ public abstract class TaskWorker {
 
 	/** Takes a tool (if the golem has none) and bone meal (up to the kept amount) from the chest. */
 	private void restock(ServerLevel level, CopperGolem golem, Container chest) {
-		if (tool(golem).isEmpty()) {
+		if (needsTool(golem)) {
 			for (int i = 0; i < chest.getContainerSize(); i++) {
 				ItemStack stack = chest.getItem(i);
 				if (wantsTool(stack)) {
@@ -480,11 +503,24 @@ public abstract class TaskWorker {
 		}
 	}
 
+	private boolean needsTool(CopperGolem golem) {
+		return usesTool() && tool(golem).isEmpty();
+	}
+
+	private boolean needsBoneMeal(CopperGolem golem) {
+		return usesBoneMeal() && countInBag(golem, Items.BONE_MEAL) < KEEP_AMOUNT
+			&& GolemInventory.get(golem).canAddItem(new ItemStack(Items.BONE_MEAL));
+	}
+
+	/** Whether the golem is missing a tool or bone meal (cheap: doesn't look at any chest). */
+	private boolean needsSupplies(CopperGolem golem) {
+		return needsTool(golem) || needsBoneMeal(golem);
+	}
+
 	/** Whether the golem is missing a tool or bone meal that this chest has. */
 	private boolean hasNeededSupplies(CopperGolem golem, Container chest) {
-		boolean needsTool = tool(golem).isEmpty();
-		boolean needsBoneMeal = usesBoneMeal() && countInBag(golem, Items.BONE_MEAL) < KEEP_AMOUNT
-			&& GolemInventory.get(golem).canAddItem(new ItemStack(Items.BONE_MEAL));
+		boolean needsTool = needsTool(golem);
+		boolean needsBoneMeal = needsBoneMeal(golem);
 		if (!needsTool && !needsBoneMeal) {
 			return false;
 		}

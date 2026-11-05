@@ -29,6 +29,11 @@ public abstract class CopperGolemMixin implements WorkingGolem {
 	@Override
 	public TaskWorker smartergolems$workerFor(GolemTaskType type) {
 		if (smartergolems$worker == null || smartergolems$workerType != type) {
+			// Clean up the old worker (open chest, navigation) even if the task was changed
+			// without going through the task screen, e.g. by a command.
+			if (smartergolems$worker != null && ((CopperGolem) (Object) this).level() instanceof ServerLevel level) {
+				smartergolems$worker.reset(level, (CopperGolem) (Object) this);
+			}
 			smartergolems$worker = type.createWorker();
 			smartergolems$workerType = type;
 		}

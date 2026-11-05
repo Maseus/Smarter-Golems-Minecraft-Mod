@@ -16,6 +16,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.animal.golem.CopperGolem;
+import net.minecraft.world.entity.animal.golem.CopperGolemState;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -159,6 +160,33 @@ public class FeaturesGameTest {
 			}
 			AABB area = new AABB(helper.absolutePos(BlockPos.ZERO)).expandTowards(8, 4, 8);
 			helper.assertTrue(helper.getLevel().getEntitiesOfClass(ItemEntity.class, area).isEmpty(), "No items should be left lying around");
+		});
+	}
+
+	/**
+	 * If the task changes behind the worker's back (e.g. via /data) while the golem has a chest
+	 * open, the old worker still cleans up: the chest closes and the golem leaves its drop-off pose.
+	 */
+	@GameTest(maxTicks = 600, padding = TestUtil.PADDING)
+	public void taskChangeClosesChest(GameTestHelper helper) {
+		floor(helper);
+		helper.setBlock(CHEST, Blocks.CHEST);
+		CopperGolem golem = farmer(helper);
+		GolemInventory.get(golem).addItem(new ItemStack(Items.WHEAT, 10)); // nothing to farm, so it deposits
+		ChestBlockEntity chest = helper.getBlockEntity(CHEST, ChestBlockEntity.class);
+		boolean[] switched = {false};
+
+		helper.onEachTick(() -> {
+			if (!switched[0] && golem.getState() == CopperGolemState.DROPPING_ITEM) {
+				switched[0] = true;
+				// Like /data: swap the task attachment directly, without going through the task screen.
+				GolemTasks.set(golem, new GolemTask(GolemTaskType.WOODCUTTING, golem.blockPosition()));
+			}
+		});
+		helper.succeedWhen(() -> {
+			helper.assertTrue(switched[0], "Golem never started depositing");
+			helper.assertTrue(golem.getState() == CopperGolemState.IDLE, "Golem should leave the drop-off pose, is " + golem.getState());
+			helper.assertTrue(chest.getEntitiesWithContainerOpen().isEmpty(), "Chest should be closed again");
 		});
 	}
 
