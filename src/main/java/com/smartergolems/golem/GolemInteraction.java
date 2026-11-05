@@ -7,6 +7,7 @@ import com.smartergolems.task.GolemTasks;
 import java.util.Optional;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -33,8 +34,9 @@ public final class GolemInteraction {
 	public static InteractionResult onTaskInteraction(CopperGolem golem, Player player) {
 		if (player instanceof ServerPlayer serverPlayer) {
 			if (ServerPlayNetworking.canSend(serverPlayer, OpenTaskScreenPayload.TYPE)) {
-				Optional<GolemTaskType> current = GolemTasks.get(golem).map(GolemTask::type);
-				ServerPlayNetworking.send(serverPlayer, new OpenTaskScreenPayload(golem.getId(), current));
+				Optional<GolemTask> current = GolemTasks.get(golem);
+				ServerPlayNetworking.send(serverPlayer, new OpenTaskScreenPayload(
+					golem.getId(), current.map(GolemTask::type), current.map(GolemTask::anchor), GolemTask.horizontalRadius()));
 			} else {
 				// Client doesn't have the mod installed, so it can't show the screen.
 				player.sendOverlayMessage(Component.translatable("message.smartergolems.client_missing_mod"));
@@ -61,7 +63,9 @@ public final class GolemInteraction {
 		GolemTask task = new GolemTask(type.get(), golem.blockPosition());
 		GolemTasks.set(golem, task);
 		BlockPos a = task.anchor();
+		int size = GolemTask.areaSize();
 		player.sendOverlayMessage(Component.translatable(
-			"message.smartergolems.task_set", task.type().displayName(), a.getX(), a.getY(), a.getZ()));
+			"message.smartergolems.task_set", task.type().displayName(), size, size, a.getX(), a.getY(), a.getZ()));
+		level.sendParticles(ParticleTypes.HAPPY_VILLAGER, golem.getX(), golem.getY() + 0.8, golem.getZ(), 10, 0.3, 0.3, 0.3, 0.0);
 	}
 }

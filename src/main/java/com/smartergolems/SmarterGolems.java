@@ -14,6 +14,7 @@ public class SmarterGolems implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
+		SmarterGolemsConfig.load();
 		GolemTasks.init();
 		GolemInventory.init();
 		ModNetworking.init();

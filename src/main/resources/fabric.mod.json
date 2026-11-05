@@ -3,7 +3,7 @@
 	"id": "smartergolems",
 	"version": "${version}",
 	"name": "Smarter Golems",
-	"description": "Give copper golems jobs. Sneak + right-click a copper golem to assign a task, such as farming a 9x9 area.",
+	"description": "Give copper golems jobs. Sneak + right-click a copper golem to assign a task, such as farming the area around it.",
 	"authors": [
 		"Maseus"
 	],

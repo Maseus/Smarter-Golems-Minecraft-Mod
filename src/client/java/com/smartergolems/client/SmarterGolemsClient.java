@@ -9,6 +9,6 @@ public class SmarterGolemsClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
 		ClientPlayNetworking.registerGlobalReceiver(OpenTaskScreenPayload.TYPE, (payload, context) ->
-			context.client().gui.setScreen(new GolemTaskScreen(payload.golemId(), payload.currentTask())));
+			context.client().gui.setScreen(new GolemTaskScreen(payload)));
 	}
 }

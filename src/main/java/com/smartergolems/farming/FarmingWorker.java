@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
@@ -50,6 +52,7 @@ public class FarmingWorker {
 	private static final int ACTION_COOLDOWN = 10;
 	private static final int IDLE_SCAN_COOLDOWN = 40;
 	private static final int DEPOSIT_DURATION = 20;
+	private static final int DEPOSIT_SOUND_TICK = 9;
 
 	private enum State { IDLE, HARVEST, PLANT, DEPOSIT, RETURN, DEPOSITING }
 
@@ -245,6 +248,7 @@ public class FarmingWorker {
 			return false;
 		}
 		level.setBlockAndUpdate(pos, planted);
+		level.playSound(null, pos, SoundEvents.CROP_PLANTED, SoundSource.BLOCKS, 1.0F, 1.0F);
 		level.gameEvent(golem, GameEvent.BLOCK_PLACE, pos);
 		return true;
 	}
@@ -277,7 +281,7 @@ public class FarmingWorker {
 
 	private Optional<BlockPos> findChest(ServerLevel level, CopperGolem golem, GolemTask task) {
 		BlockPos anchor = task.anchor();
-		int radius = GolemTask.HORIZONTAL_RADIUS + CHEST_SEARCH_EXTRA;
+		int radius = GolemTask.horizontalRadius() + CHEST_SEARCH_EXTRA;
 		Iterable<BlockPos> positions = BlockPos.betweenClosed(
 			anchor.offset(-radius, -GolemTask.VERTICAL_RADIUS, -radius),
 			anchor.offset(radius, GolemTask.VERTICAL_RADIUS, radius));
@@ -323,6 +327,10 @@ public class FarmingWorker {
 	}
 
 	private void tickDepositing(ServerLevel level, CopperGolem golem) {
+		if (ticksInState == DEPOSIT_SOUND_TICK) {
+			// Same timing as the vanilla golem's item drop-off sound.
+			golem.playSound(SoundEvents.COPPER_GOLEM_ITEM_DROP);
+		}
 		if (ticksInState >= DEPOSIT_DURATION) {
 			closeChest(level, golem);
 			cooldown = ACTION_COOLDOWN;
