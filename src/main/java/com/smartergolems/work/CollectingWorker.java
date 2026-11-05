@@ -31,7 +31,7 @@ public class CollectingWorker extends TaskWorker {
 	}
 
 	private static List<ItemEntity> itemsInArea(ServerLevel level, GolemTask task) {
-		int r = GolemTask.horizontalRadius();
+		int r = task.radius();
 		AABB area = new AABB(task.anchor()).inflate(r, GolemTask.VERTICAL_RADIUS, r);
 		return level.getEntitiesOfClass(ItemEntity.class, area, ItemEntity::isAlive);
 	}

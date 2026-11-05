@@ -52,7 +52,7 @@ public class FeaturesGameTest {
 		helper.setBlock(1, 0, 5, Blocks.SOUL_SAND);
 		helper.setBlock(new BlockPos(1, 1, 5), Blocks.NETHER_WART.defaultBlockState().setValue(NetherWartBlock.AGE, NetherWartBlock.MAX_AGE));
 		// Ripe sweet berry bush.
-		helper.setBlock(new BlockPos(6, 1, 3), Blocks.SWEET_BERRY_BUSH.defaultBlockState().setValue(SweetBerryBushBlock.AGE, SweetBerryBushBlock.MAX_AGE));
+		helper.setBlock(new BlockPos(4, 1, 2), Blocks.SWEET_BERRY_BUSH.defaultBlockState().setValue(SweetBerryBushBlock.AGE, SweetBerryBushBlock.MAX_AGE));
 
 		farmer(helper);
 
@@ -65,7 +65,7 @@ public class FeaturesGameTest {
 			helper.assertBlockPresent(Blocks.AIR, new BlockPos(5, 2, 4));
 			helper.assertBlockState(new BlockPos(1, 1, 5), s -> s.is(Blocks.NETHER_WART) && s.getValue(NetherWartBlock.AGE) == 0,
 				s -> Component.literal("Expected replanted nether wart, found " + s));
-			helper.assertBlockState(new BlockPos(6, 1, 3), s -> s.is(Blocks.SWEET_BERRY_BUSH) && s.getValue(SweetBerryBushBlock.AGE) == 1,
+			helper.assertBlockState(new BlockPos(4, 1, 2), s -> s.is(Blocks.SWEET_BERRY_BUSH) && s.getValue(SweetBerryBushBlock.AGE) == 1,
 				s -> Component.literal("Expected a picked berry bush, found " + s));
 		});
 	}
@@ -187,6 +187,52 @@ public class FeaturesGameTest {
 			helper.assertTrue(switched[0], "Golem never started depositing");
 			helper.assertTrue(golem.getState() == CopperGolemState.IDLE, "Golem should leave the drop-off pose, is " + golem.getState());
 			helper.assertTrue(chest.getEntitiesWithContainerOpen().isEmpty(), "Chest should be closed again");
+		});
+	}
+
+	/**
+	 * Farming centers on the nearest chest, so a waterlogged chest in the middle of a 9x9 farm defines
+	 * the area exactly. Other tasks still center on the golem.
+	 */
+	@GameTest(padding = TestUtil.PADDING)
+	public void farmingCentersOnChest(GameTestHelper helper) {
+		floor(helper);
+		BlockPos chestPos = new BlockPos(4, 0, 4);
+		helper.setBlock(chestPos, Blocks.CHEST.defaultBlockState().setValue(net.minecraft.world.level.block.ChestBlock.WATERLOGGED, true));
+		ServerPlayer player = helper.makeMockServerPlayerInLevel();
+		CopperGolem farmer = helper.spawn(EntityTypes.COPPER_GOLEM, GOLEM);
+		CopperGolem woodcutter = helper.spawn(EntityTypes.COPPER_GOLEM, new BlockPos(6, 1, 1));
+
+		GolemInteraction.applyTask(farmer, player, Optional.of(GolemTaskType.FARMING));
+		GolemInteraction.applyTask(woodcutter, player, Optional.of(GolemTaskType.WOODCUTTING));
+
+		GolemTask farming = GolemTasks.get(farmer).orElseThrow();
+		helper.assertValueEqual(farming.anchor(), helper.absolutePos(chestPos), "farming anchor");
+		helper.assertValueEqual(farming.areaSize(), 9, "farming area size");
+		GolemTask woodcutting = GolemTasks.get(woodcutter).orElseThrow();
+		helper.assertValueEqual(woodcutting.anchor(), woodcutter.blockPosition(), "woodcutting anchor");
+		helper.assertValueEqual(woodcutting.areaSize(), 15, "woodcutting area size");
+		helper.succeed();
+	}
+
+	/** The 9x9 farm reaches 4 blocks from its center, like water: a crop 5 blocks out is left alone. */
+	@GameTest(maxTicks = 800, padding = TestUtil.PADDING)
+	public void farmStopsAtWaterRange(GameTestHelper helper) {
+		floor(helper);
+		BlockPos inside = new BlockPos(5, 1, 1);  // 4 blocks from the golem
+		BlockPos outside = new BlockPos(6, 1, 1); // 5 blocks from the golem
+		for (BlockPos crop : new BlockPos[] {inside, outside}) {
+			helper.setBlock(crop.below(), Blocks.FARMLAND);
+			helper.setBlock(crop, ((CropBlock) Blocks.WHEAT).getStateForAge(7));
+		}
+		farmer(helper);
+
+		helper.runAtTickTime(600, () -> {
+			helper.assertBlockState(inside, s -> s.is(Blocks.WHEAT) && s.getValue(CropBlock.AGE) < 7,
+				s -> Component.literal("Wheat 4 blocks out should be harvested and replanted, found " + s));
+			helper.assertBlockState(outside, s -> s.is(Blocks.WHEAT) && s.getValue(CropBlock.AGE) == 7,
+				s -> Component.literal("Wheat 5 blocks out should be left alone, found " + s));
+			helper.succeed();
 		});
 	}
 

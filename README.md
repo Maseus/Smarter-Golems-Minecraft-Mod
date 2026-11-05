@@ -12,7 +12,9 @@ Built for **Minecraft 26.3** with **Fabric**.
 
 1. Build a copper golem the vanilla way: a carved pumpkin on a copper block.
 2. Stand it where you want it to work, then **sneak + right-click it with an empty hand**.
-3. Pick a task. The golem works a **15x15 area** centered on where it stood. While the menu is open, particles outline that area.
+3. Pick a task. While the menu is open, particles outline the golem's work area.
+   - **Farming** covers a **9x9 area**, the same reach as water hydrating farmland. It's centered on the **nearest chest**, so the classic layout just works: a **waterlogged chest** in the middle of a 9x9 farm. With no chest nearby, it centers on the golem.
+   - **Woodcutting and collecting** cover a **15x15 area** centered on where the golem stood.
 4. Put a **chest** in or near the area (up to 4 blocks outside it). The golem drops its haul there.
 
 Choose **No task** to give a golem its vanilla behavior back. Anything still in its bag is dropped.
@@ -83,11 +85,15 @@ Oxidized golems work slower:
 
 ```json
 {
-  "farmRadius": 7
+  "farmingRadius": 4,
+  "areaRadius": 7
 }
 ```
 
-`farmRadius` is the distance from the center to the edge of the work area. 7 gives 15x15, and the allowed range is 1 to 16. Restart the game or server after changing it.
+- `farmingRadius`: the distance from the center to the edge of a farm. 4 gives 9x9, matching one water source.
+- `areaRadius`: the same for woodcutting and collecting. 7 gives 15x15.
+
+The allowed range for both is 1 to 16. Restart the game or server after changing them. A config file from before 1.1.0 (`farmRadius`) is converted automatically.
 
 ## Requirements
 

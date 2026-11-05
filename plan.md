@@ -7,7 +7,7 @@ Copper golems are built the vanilla way (carved pumpkin on a copper block).
 **Sneak + right-click** a copper golem opens a task GUI. A normal right-click keeps vanilla behavior.
 
 ## Task: Farming (first feature)
-- Farm area: 15x15 by default (`farmRadius` in `config/smartergolems.json`, 7 = 15x15), centered on the block where the golem stood when the task was assigned (the "work anchor").
+- Farm area: 9x9 by default, the same reach as water hydrating farmland (`farmingRadius` in `config/smartergolems.json`). It's centered on the nearest chest when assigned (e.g. a waterlogged chest in the middle of the farm), else on the golem. Woodcutting and collecting use `areaRadius` (default 7 = 15x15) centered on the golem.
 - Loop: find a fully grown crop in the area → walk to it → break it → replant from its own harvest → when holding items, walk to the nearest chest and deposit → repeat.
 - Crops: wheat, carrots, potatoes, beetroot (any `CropBlock`), nether wart, sweet berries (picked, bush stays), cocoa, pumpkins/melons grown from a stem (decorative ones are left alone), sugar cane/cactus/bamboo (base block kept).
 - Plants carried seeds on empty farmland and nether wart on empty soul sand; keeps 16 of each seed.

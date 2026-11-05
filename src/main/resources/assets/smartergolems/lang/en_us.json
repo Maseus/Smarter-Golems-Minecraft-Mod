@@ -24,5 +24,6 @@
 	"activity.smartergolems.chopping": "Chopping",
 	"activity.smartergolems.collecting": "Collecting",
 	"activity.smartergolems.depositing": "Depositing",
-	"activity.smartergolems.returning": "Returning"
+	"activity.smartergolems.returning": "Returning",
+	"message.smartergolems.task_set_chest": "Task: %s (%sx%s around the chest at %s, %s, %s)"
 }

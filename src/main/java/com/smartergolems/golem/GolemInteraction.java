@@ -20,6 +20,7 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.animal.golem.CopperGolem;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import com.smartergolems.work.TaskWorker;
 
 /** Handles the "sneak + right-click" interaction and the task screen's requests. */
 public final class GolemInteraction {
@@ -61,7 +62,8 @@ public final class GolemInteraction {
 			}
 		}
 		ServerPlayNetworking.send(player, new OpenTaskScreenPayload(
-			golem.getId(), current.map(GolemTask::type), current.map(GolemTask::anchor), GolemTask.horizontalRadius(),
+			golem.getId(), current.map(GolemTask::type), current.map(GolemTask::anchor),
+			current.map(GolemTask::radius).orElse(GolemTask.radiusFor(GolemTaskType.WOODCUTTING)),
 			bag, golem.getMainHandItem().copy(), current.map(GolemTask::ownerName).orElse(""), canEdit(golem, player)));
 	}
 
@@ -111,14 +113,31 @@ public final class GolemInteraction {
 			golem.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
 			GolemInventory.addOrDrop(golem, level, held);
 		}
-		// The work area is centered where the golem stands now; picking a task again re-centers it.
-		GolemTask task = new GolemTask(type.get(), golem.blockPosition(), Optional.of(player.getUUID()), player.getPlainTextName());
+		// Farming centers on the nearest chest (e.g. a waterlogged chest in the middle of a 9x9 farm);
+		// otherwise the area is centered where the golem stands. Picking a task again re-centers it.
+		Optional<BlockPos> chest = type.get() == GolemTaskType.FARMING ? findFarmChest(level, golem) : Optional.empty();
+		GolemTask task = new GolemTask(type.get(), chest.orElse(golem.blockPosition()), Optional.of(player.getUUID()), player.getPlainTextName());
 		GolemTasks.set(golem, task);
 		BlockPos a = task.anchor();
-		int size = GolemTask.areaSize();
+		int size = task.areaSize();
 		player.sendOverlayMessage(Component.translatable(
-			"message.smartergolems.task_set", task.type().displayName(), size, size, a.getX(), a.getY(), a.getZ()));
+			chest.isPresent() ? "message.smartergolems.task_set_chest" : "message.smartergolems.task_set",
+			task.type().displayName(), size, size, a.getX(), a.getY(), a.getZ()));
 		level.sendParticles(ParticleTypes.HAPPY_VILLAGER, golem.getX(), golem.getY() + 0.8, golem.getZ(), 10, 0.3, 0.3, 0.3, 0.0);
+	}
+
+	/** The chest nearest the golem, within one farm's width of it, to center a farm on. */
+	public static Optional<BlockPos> findFarmChest(ServerLevel level, CopperGolem golem) {
+		int reach = GolemTask.radiusFor(GolemTaskType.FARMING) * 2;
+		BlockPos from = golem.blockPosition();
+		BlockPos best = null;
+		for (BlockPos pos : BlockPos.betweenClosed(from.offset(-reach, -GolemTask.VERTICAL_RADIUS, -reach),
+			from.offset(reach, GolemTask.VERTICAL_RADIUS, reach))) {
+			if (TaskWorker.isUsableChest(level.getBlockState(pos)) && (best == null || pos.distSqr(from) < best.distSqr(from))) {
+				best = pos.immutable();
+			}
+		}
+		return Optional.ofNullable(best);
 	}
 
 	/** Server side: give the player everything in the golem's bag, then refresh their screen. */

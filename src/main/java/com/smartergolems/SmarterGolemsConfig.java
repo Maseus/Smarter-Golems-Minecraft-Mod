@@ -15,12 +15,21 @@ import net.fabricmc.loader.api.FabricLoader;
  */
 public final class SmarterGolemsConfig {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-	private static final int MIN_FARM_RADIUS = 1;
-	private static final int MAX_FARM_RADIUS = 16;
+	private static final int MIN_RADIUS = 1;
+	private static final int MAX_RADIUS = 16;
 	private static SmarterGolemsConfig instance = new SmarterGolemsConfig();
 
-	/** Blocks from the center to the edge of a farm. 7 gives a 15x15 area (2 * 7 + 1). */
-	public int farmRadius = 7;
+	/**
+	 * Blocks from the center to the edge of a farm. 4 gives a 9x9 area (2 * 4 + 1): exactly the
+	 * farmland one water source keeps wet, e.g. around a waterlogged chest in the middle.
+	 */
+	public int farmingRadius = 4;
+
+	/** Blocks from the center to the edge of the area for other tasks. 7 gives 15x15. */
+	public int areaRadius = 7;
+
+	/** Before 1.1.0 one radius ({@code farmRadius}) applied to all tasks; read it once as {@link #areaRadius}. */
+	private Integer farmRadius;
 
 	public static SmarterGolemsConfig get() {
 		return instance;
@@ -40,7 +49,12 @@ public final class SmarterGolemsConfig {
 			}
 		}
 		instance = loaded != null ? loaded : new SmarterGolemsConfig();
-		instance.farmRadius = Math.clamp(instance.farmRadius, MIN_FARM_RADIUS, MAX_FARM_RADIUS);
+		if (instance.farmRadius != null) {
+			instance.areaRadius = instance.farmRadius;
+			instance.farmRadius = null; // null fields aren't written back, so the old key goes away
+		}
+		instance.farmingRadius = Math.clamp(instance.farmingRadius, MIN_RADIUS, MAX_RADIUS);
+		instance.areaRadius = Math.clamp(instance.areaRadius, MIN_RADIUS, MAX_RADIUS);
 
 		// Write back so new options appear in the file and out-of-range values are corrected.
 		try {

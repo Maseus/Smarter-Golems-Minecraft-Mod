@@ -33,19 +33,25 @@ public record GolemTask(GolemTaskType type, BlockPos anchor, Optional<UUID> owne
 		this(type, anchor, Optional.empty(), "");
 	}
 
-	/** Blocks from the anchor to the edge of the area horizontally (from the config; 7 gives 15x15). */
-	public static int horizontalRadius() {
-		return SmarterGolemsConfig.get().farmRadius;
+	/** Blocks from the anchor to the edge of the area horizontally for this task (from the config). */
+	public int radius() {
+		return radiusFor(type);
+	}
+
+	/** Farming uses the water range (9x9 by default); other tasks the general area (15x15). */
+	public static int radiusFor(GolemTaskType type) {
+		SmarterGolemsConfig config = SmarterGolemsConfig.get();
+		return type == GolemTaskType.FARMING ? config.farmingRadius : config.areaRadius;
 	}
 
 	/** Width of the square work area in blocks. */
-	public static int areaSize() {
-		return horizontalRadius() * 2 + 1;
+	public int areaSize() {
+		return radius() * 2 + 1;
 	}
 
 	/** Every block position in the work area. */
 	public Iterable<BlockPos> areaPositions() {
-		int r = horizontalRadius();
+		int r = radius();
 		return BlockPos.betweenClosed(
 			anchor.offset(-r, -VERTICAL_RADIUS, -r),
 			anchor.offset(r, VERTICAL_RADIUS, r)

@@ -122,14 +122,18 @@ public class GolemTaskScreen extends Screen {
 		}
 	}
 
-	/** Particles along the border of the square work area, at the level of the crops. */
+	/**
+	 * Particles along the border of the square work area, at the level of the crops. A farm centered
+	 * on a chest sits at ground level, so the outline goes one block up to stay visible.
+	 */
 	private void spawnOutline(BlockPos center, DustParticleOptions particle) {
 		int radius = data.radius();
 		double minX = center.getX() - radius;
 		double minZ = center.getZ() - radius;
 		double maxX = center.getX() + radius + 1;
 		double maxZ = center.getZ() + radius + 1;
-		double y = center.getY() + 0.2;
+		boolean solidCenter = !this.minecraft.level.getBlockState(center).getCollisionShape(this.minecraft.level, center).isEmpty();
+		double y = center.getY() + (solidCenter ? 1.2 : 0.2);
 		for (double d = 0; d <= maxX - minX; d += 0.5) {
 			this.minecraft.level.addParticle(particle, minX + d, y, minZ, 0, 0, 0);
 			this.minecraft.level.addParticle(particle, minX + d, y, maxZ, 0, 0, 0);

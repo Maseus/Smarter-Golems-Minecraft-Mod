@@ -381,10 +381,15 @@ public abstract class TaskWorker {
 
 	// ---- Chests: depositing and restocking ----
 
+	/** Whether this block is a chest a golem can use (chest, trapped chest or copper chest). */
+	public static boolean isUsableChest(BlockState state) {
+		return state.is(Blocks.CHEST) || state.is(Blocks.TRAPPED_CHEST) || state.is(BlockTags.COPPER_CHESTS);
+	}
+
 	/** Usable chests in and around the work area (not currently skipped), nearest first. */
 	private List<BlockPos> findChests(ServerLevel level, CopperGolem golem, GolemTask task) {
 		BlockPos anchor = task.anchor();
-		int radius = GolemTask.horizontalRadius() + CHEST_SEARCH_EXTRA;
+		int radius = task.radius() + CHEST_SEARCH_EXTRA;
 		List<BlockPos> chests = new ArrayList<>();
 		for (BlockPos pos : BlockPos.betweenClosed(
 			anchor.offset(-radius, -GolemTask.VERTICAL_RADIUS, -radius),
@@ -419,8 +424,7 @@ public abstract class TaskWorker {
 	/** The chest's container (both halves for a double chest), or null if it isn't a usable chest. */
 	private static @Nullable Container getChest(ServerLevel level, BlockPos pos) {
 		BlockState blockState = level.getBlockState(pos);
-		boolean isChest = blockState.is(Blocks.CHEST) || blockState.is(Blocks.TRAPPED_CHEST) || blockState.is(BlockTags.COPPER_CHESTS);
-		if (isChest && blockState.getBlock() instanceof ChestBlock chestBlock) {
+		if (isUsableChest(blockState) && blockState.getBlock() instanceof ChestBlock chestBlock) {
 			return ChestBlock.getContainer(chestBlock, blockState, level, pos, false);
 		}
 		return null;
