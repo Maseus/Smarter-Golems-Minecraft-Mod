@@ -1,6 +1,10 @@
 package com.smartergolems.golem;
 
-import com.smartergolems.SmarterGolems;
+import com.smartergolems.task.GolemTask;
+import com.smartergolems.task.GolemTaskType;
+import com.smartergolems.task.GolemTasks;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -24,9 +28,18 @@ public final class GolemInteraction {
 	/** Called on both client and server; only the server acts. */
 	public static InteractionResult onTaskInteraction(CopperGolem golem, Player player) {
 		if (!golem.level().isClientSide()) {
-			// Placeholder until the task GUI exists (plan step 4).
-			player.sendOverlayMessage(Component.translatable("message.smartergolems.task_menu_placeholder"));
-			SmarterGolems.LOGGER.debug("{} opened task interaction on golem {}", player.getName().getString(), golem.getUUID());
+			// Temporary until the task GUI exists (plan step 4): toggle farming on/off.
+			Optional<GolemTask> current = GolemTasks.get(golem);
+			if (current.isPresent()) {
+				GolemTasks.clear(golem);
+				player.sendOverlayMessage(Component.translatable("message.smartergolems.task_cleared"));
+			} else {
+				GolemTask task = new GolemTask(GolemTaskType.FARMING, golem.blockPosition());
+				GolemTasks.set(golem, task);
+				BlockPos a = task.anchor();
+				player.sendOverlayMessage(Component.translatable(
+					"message.smartergolems.task_set", task.type().displayName(), a.getX(), a.getY(), a.getZ()));
+			}
 		}
 		return InteractionResult.SUCCESS;
 	}

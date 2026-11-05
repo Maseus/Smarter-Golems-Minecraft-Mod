@@ -1,3 +1,5 @@
 {
-	"message.smartergolems.task_menu_placeholder": "Smarter Golems: task menu coming soon!"
+	"task.smartergolems.farming": "Farming",
+	"message.smartergolems.task_set": "Task: %s (9x9 around %s, %s, %s)",
+	"message.smartergolems.task_cleared": "Task cleared"
 }

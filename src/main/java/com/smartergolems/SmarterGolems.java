@@ -1,5 +1,6 @@
 package com.smartergolems;
 
+import com.smartergolems.task.GolemTasks;
 import net.fabricmc.api.ModInitializer;
 import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
@@ -11,6 +12,7 @@ public class SmarterGolems implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
+		GolemTasks.init();
 		LOGGER.info("Smarter Golems loaded");
 	}
 
