@@ -1,0 +1,34 @@
+{
+	"schemaVersion": 1,
+	"id": "smartergolems",
+	"version": "${version}",
+	"name": "Smarter Golems",
+	"description": "Give copper golems jobs. Sneak + right-click a copper golem to assign a task, such as farming a 9x9 area.",
+	"authors": [
+		"Maseus"
+	],
+	"license": "MIT",
+	"icon": "assets/smartergolems/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.smartergolems.SmarterGolems"
+		],
+		"client": [
+			"com.smartergolems.client.SmarterGolemsClient"
+		]
+	},
+	"mixins": [
+		"smartergolems.mixins.json",
+		{
+			"config": "smartergolems.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.20.1",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
