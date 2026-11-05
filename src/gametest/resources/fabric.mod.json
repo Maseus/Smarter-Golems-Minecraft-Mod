@@ -1,0 +1,15 @@
+{
+	"schemaVersion": 1,
+	"id": "smartergolems-test",
+	"version": "1.0.0",
+	"name": "Smarter Golems Tests",
+	"environment": "*",
+	"entrypoints": {
+		"fabric-gametest": [
+			"com.smartergolems.test.FarmingGameTest"
+		]
+	},
+	"depends": {
+		"smartergolems": "*"
+	}
+}

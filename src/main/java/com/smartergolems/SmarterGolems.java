@@ -1,5 +1,6 @@
 package com.smartergolems;
 
+import com.smartergolems.golem.GolemInventory;
 import com.smartergolems.network.ModNetworking;
 import com.smartergolems.task.GolemTasks;
 import net.fabricmc.api.ModInitializer;
@@ -14,6 +15,7 @@ public class SmarterGolems implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		GolemTasks.init();
+		GolemInventory.init();
 		ModNetworking.init();
 		LOGGER.info("Smarter Golems loaded");
 	}

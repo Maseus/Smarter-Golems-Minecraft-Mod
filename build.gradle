@@ -22,6 +22,16 @@ loom {
 	}
 }
 
+fabricApi {
+	configureTests {
+		createSourceSet = true
+		modId = "smartergolems-test"
+		enableGameTests = true // server game tests run as part of `./gradlew build`
+		enableClientGameTests = false
+		eula = true // accepts the Minecraft EULA for the headless test server
+	}
+}
+
 dependencies {
 	// To change the versions see the gradle.properties file
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"

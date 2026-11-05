@@ -8,6 +8,7 @@ import java.util.Optional;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -44,8 +45,15 @@ public final class GolemInteraction {
 
 	/** Server side: apply the player's choice from the task screen. Empty means "No task". */
 	public static void applyTask(CopperGolem golem, ServerPlayer player, Optional<GolemTaskType> type) {
+		ServerLevel level = player.level();
+		// Stop whatever the golem was doing (vanilla chest sorting or a previous task) before switching.
+		((WorkingGolem) golem).smartergolems$getFarmingWorker().reset(level, golem);
+		golem.getBrain().stopAll(level, golem);
+
 		if (type.isEmpty()) {
 			GolemTasks.clear(golem);
+			// Hand back anything the golem was carrying for its old task.
+			GolemInventory.dropAll(golem, level);
 			player.sendOverlayMessage(Component.translatable("message.smartergolems.task_cleared"));
 			return;
 		}
