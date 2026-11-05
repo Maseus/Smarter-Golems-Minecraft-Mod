@@ -1,5 +1,9 @@
 {
+	"screen.smartergolems.title": "Copper Golem Tasks",
+	"screen.smartergolems.current": "Current task: %s",
 	"task.smartergolems.farming": "Farming",
+	"task.smartergolems.none": "No task",
 	"message.smartergolems.task_set": "Task: %s (9x9 around %s, %s, %s)",
-	"message.smartergolems.task_cleared": "Task cleared"
+	"message.smartergolems.task_cleared": "Task cleared",
+	"message.smartergolems.client_missing_mod": "Install Smarter Golems on your client to assign tasks"
 }

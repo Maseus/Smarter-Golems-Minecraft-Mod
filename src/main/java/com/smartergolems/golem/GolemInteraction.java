@@ -1,11 +1,14 @@
 package com.smartergolems.golem;
 
+import com.smartergolems.network.OpenTaskScreenPayload;
 import com.smartergolems.task.GolemTask;
 import com.smartergolems.task.GolemTaskType;
 import com.smartergolems.task.GolemTasks;
 import java.util.Optional;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.animal.golem.CopperGolem;
@@ -25,22 +28,32 @@ public final class GolemInteraction {
 			&& player.getItemInHand(hand).isEmpty();
 	}
 
-	/** Called on both client and server; only the server acts. */
+	/** Called on both client and server; only the server acts, by telling the client to open the task screen. */
 	public static InteractionResult onTaskInteraction(CopperGolem golem, Player player) {
-		if (!golem.level().isClientSide()) {
-			// Temporary until the task GUI exists (plan step 4): toggle farming on/off.
-			Optional<GolemTask> current = GolemTasks.get(golem);
-			if (current.isPresent()) {
-				GolemTasks.clear(golem);
-				player.sendOverlayMessage(Component.translatable("message.smartergolems.task_cleared"));
+		if (player instanceof ServerPlayer serverPlayer) {
+			if (ServerPlayNetworking.canSend(serverPlayer, OpenTaskScreenPayload.TYPE)) {
+				Optional<GolemTaskType> current = GolemTasks.get(golem).map(GolemTask::type);
+				ServerPlayNetworking.send(serverPlayer, new OpenTaskScreenPayload(golem.getId(), current));
 			} else {
-				GolemTask task = new GolemTask(GolemTaskType.FARMING, golem.blockPosition());
-				GolemTasks.set(golem, task);
-				BlockPos a = task.anchor();
-				player.sendOverlayMessage(Component.translatable(
-					"message.smartergolems.task_set", task.type().displayName(), a.getX(), a.getY(), a.getZ()));
+				// Client doesn't have the mod installed, so it can't show the screen.
+				player.sendOverlayMessage(Component.translatable("message.smartergolems.client_missing_mod"));
 			}
 		}
 		return InteractionResult.SUCCESS;
+	}
+
+	/** Server side: apply the player's choice from the task screen. Empty means "No task". */
+	public static void applyTask(CopperGolem golem, ServerPlayer player, Optional<GolemTaskType> type) {
+		if (type.isEmpty()) {
+			GolemTasks.clear(golem);
+			player.sendOverlayMessage(Component.translatable("message.smartergolems.task_cleared"));
+			return;
+		}
+		// The work area is centered where the golem stands now; picking a task again re-centers it.
+		GolemTask task = new GolemTask(type.get(), golem.blockPosition());
+		GolemTasks.set(golem, task);
+		BlockPos a = task.anchor();
+		player.sendOverlayMessage(Component.translatable(
+			"message.smartergolems.task_set", task.type().displayName(), a.getX(), a.getY(), a.getZ()));
 	}
 }

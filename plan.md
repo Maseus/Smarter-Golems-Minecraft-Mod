@@ -16,8 +16,8 @@ Copper golems are built the vanilla way (carved pumpkin on a copper block).
 ## Milestones
 1. **Project skeleton**: builds and launches with `./gradlew runClient`. ✅
 2. **Interaction hook**: mixin on the copper golem's `mobInteract` that catches sneak + right-click (server side) and opens the menu. ✅ (sneak + empty main hand)
-3. **Task data**: a persistent per-golem component (task type + anchor pos), saved with the entity and kept after reload. (Fabric Data Attachment API; sneak-click toggles farming until the GUI exists)
-4. **Task GUI**: a menu/screen with "Farming" and "None"; selection sent to the server with a custom payload.
+3. **Task data**: a persistent per-golem component (task type + anchor pos), saved with the entity and kept after reload. ✅ (Fabric Data Attachment API)
+4. **Task GUI**: a screen with "Farming" and "No task"; selection sent to the server with a custom payload (server re-checks golem + reach).
 5. **Farming AI**: replaces/suspends the golem's vanilla brain behaviors while a task is active; harvest → replant → deposit.
 6. **Polish**: visual area outline while the GUI is open, config (area size), sounds/particles, lang file.
 
