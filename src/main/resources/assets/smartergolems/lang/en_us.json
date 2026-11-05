@@ -7,5 +7,22 @@
 	"task.smartergolems.none": "No task",
 	"message.smartergolems.task_set": "Task: %s (%sx%s around %s, %s, %s)",
 	"message.smartergolems.task_cleared": "Task cleared",
-	"message.smartergolems.client_missing_mod": "Install Smarter Golems on your client to assign tasks"
+	"message.smartergolems.client_missing_mod": "Install Smarter Golems on your client to assign tasks",
+	"task.smartergolems.collecting": "Collecting",
+	"screen.smartergolems.owner": "Assigned by %s",
+	"screen.smartergolems.owner_locked": "Assigned by %s (locked)",
+	"screen.smartergolems.carrying": "Tool and carried items",
+	"screen.smartergolems.tool_slot": "Tool: put an axe (woodcutting) or hoe (farming) in its chest",
+	"screen.smartergolems.take_items": "Take items",
+	"message.smartergolems.not_owner": "This golem works for %s",
+	"status.smartergolems.format": "%s · %s",
+	"activity.smartergolems.idle": "Idle",
+	"activity.smartergolems.harvesting": "Harvesting",
+	"activity.smartergolems.planting": "Planting",
+	"activity.smartergolems.tilling": "Tilling",
+	"activity.smartergolems.fertilizing": "Fertilizing",
+	"activity.smartergolems.chopping": "Chopping",
+	"activity.smartergolems.collecting": "Collecting",
+	"activity.smartergolems.depositing": "Depositing",
+	"activity.smartergolems.returning": "Returning"
 }

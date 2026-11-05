@@ -1,6 +1,7 @@
 package com.smartergolems.work;
 
 import com.smartergolems.golem.GolemInventory;
+import com.smartergolems.golem.GolemStatus;
 import com.smartergolems.task.GolemTask;
 import java.util.HashMap;
 import java.util.Map;
@@ -12,17 +13,19 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.util.Mth;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.animal.golem.CopperGolem;
 import net.minecraft.world.entity.animal.golem.CopperGolemState;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.util.Mth;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.entity.HopperBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.pathfinder.Path;
@@ -33,14 +36,16 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Shared logic for a golem doing a task: walking to jobs, giving up on unreachable spots,
- * depositing carried items into chests and returning home. Runs on the server every tick
- * instead of the golem's vanilla brain. Subclasses only decide what work to look for.
+ * depositing carried items into chests (and restocking tools / bone meal from them) and
+ * returning home. Runs on the server every tick instead of the golem's vanilla brain.
+ * Subclasses only decide what work to look for.
  *
  * Priorities when idle:
  * 1. Deposit into a chest when the bag is getting full.
  * 2. The task's own work ({@link #findWork}).
  * 3. Deposit whatever is left when there's nothing else to do.
- * 4. Walk back to the middle of the work area.
+ * 4. Fetch missing supplies (tool, bone meal) from a chest that has them.
+ * 5. Walk back to the middle of the work area.
  *
  * State is not saved: after a reload the golem simply picks its next job again.
  */
@@ -73,11 +78,11 @@ public abstract class TaskWorker {
 	 * e.g. if the target changed), then keep working for {@code workTicks} (scaled by
 	 * oxidation) calling {@code onWorkTick}, then run {@code onFinish}.
 	 */
-	protected record Job(BlockPos target, double reach, int workTicks, BooleanSupplier onArrive,
+	protected record Job(Activity activity, BlockPos target, double reach, int workTicks, BooleanSupplier onArrive,
 	                     @Nullable IntConsumer onWorkTick, @Nullable Runnable onFinish) {
 		/** A job that happens immediately on arrival. */
-		public static Job instant(BlockPos target, double reach, Runnable action) {
-			return new Job(target, reach, 0, () -> {
+		public static Job instant(Activity activity, BlockPos target, double reach, Runnable action) {
+			return new Job(activity, target, reach, 0, () -> {
 				action.run();
 				return true;
 			}, null, null);
@@ -98,17 +103,29 @@ public abstract class TaskWorker {
 	/** The next piece of task-specific work, if any. */
 	protected abstract Optional<Job> findWork(ServerLevel level, CopperGolem golem, GolemTask task);
 
+	/** Whether this item is a tool this task can use (held in the golem's hand). */
+	public boolean wantsTool(ItemStack stack) {
+		return false;
+	}
+
+	/** Whether this task uses bone meal (kept in the bag and restocked from chests). */
+	protected boolean usesBoneMeal() {
+		return false;
+	}
+
 	/**
 	 * How many of this item to hold back when depositing, e.g. seeds or saplings needed for
 	 * replanting. The total kept per item type is capped at this amount.
 	 */
 	protected int amountToKeep(ItemStack stack) {
-		return 0;
+		return usesBoneMeal() && stack.is(Items.BONE_MEAL) ? KEEP_AMOUNT : 0;
 	}
 
 	public final void tick(ServerLevel level, CopperGolem golem, GolemTask task) {
 		ticksInPhase++;
 		golem.setPathfindingMalus(PathType.LEAVES, LEAVES_PATH_COST);
+		// Sweet berry bushes would slowly hurt the golem to death; walk around them.
+		golem.setPathfindingMalus(PathType.DAMAGE_CAUTIOUS, -1.0F);
 		if ((phase == Phase.MOVING || phase == Phase.RETURNING) && golem.horizontalCollision) {
 			clearLeavesInTheWay(level, golem);
 		}
@@ -118,12 +135,22 @@ public abstract class TaskWorker {
 			case WORKING -> tickWorking(golem);
 			case RETURNING -> tickReturning(golem);
 		}
+		GolemStatus.set(golem, task.type(), currentActivity());
+	}
+
+	private Activity currentActivity() {
+		return switch (phase) {
+			case IDLE -> Activity.IDLE;
+			case MOVING, WORKING -> job != null ? job.activity() : Activity.IDLE;
+			case RETURNING -> Activity.RETURNING;
+		};
 	}
 
 	/** Stops whatever the golem is doing, e.g. when its task changes. */
 	public void reset(ServerLevel level, CopperGolem golem) {
 		closeChest(level, golem);
 		golem.setPathfindingMalus(PathType.LEAVES, PathType.LEAVES.getMalus());
+		golem.setPathfindingMalus(PathType.DAMAGE_CAUTIOUS, PathType.DAMAGE_CAUTIOUS.getMalus());
 		golem.getNavigation().stop();
 		golem.setState(CopperGolemState.IDLE);
 		setPhase(Phase.IDLE, null);
@@ -144,13 +171,16 @@ public abstract class TaskWorker {
 		boolean canDeposit = hasItemsToDeposit(golem);
 		Optional<Job> next = Optional.empty();
 		if (canDeposit && GolemInventory.usedSlots(golem) >= DEPOSIT_THRESHOLD_SLOTS) {
-			next = depositJob(level, golem, task);
+			next = chestJob(level, golem, task, chest -> true);
 		}
 		if (next.isEmpty()) {
 			next = findWork(level, golem, task);
 		}
 		if (next.isEmpty() && canDeposit) {
-			next = depositJob(level, golem, task);
+			next = chestJob(level, golem, task, chest -> true);
+		}
+		if (next.isEmpty()) {
+			next = chestJob(level, golem, task, chest -> hasNeededSupplies(golem, chest));
 		}
 		if (next.isPresent()) {
 			setPhase(Phase.MOVING, next.get());
@@ -255,20 +285,6 @@ public abstract class TaskWorker {
 
 	// ---- Helpers for subclasses ----
 
-	/** Leaves that grew naturally (player-placed leaves are "persistent"). */
-	protected static boolean isNaturalLeaves(BlockState state) {
-		return state.getBlock() instanceof LeavesBlock
-			&& state.hasProperty(LeavesBlock.PERSISTENT) && !state.getValue(LeavesBlock.PERSISTENT);
-	}
-
-	/** Puts a block's drops into the golem's bag (overflow is dropped on the ground). */
-	protected static void collectDrops(ServerLevel level, CopperGolem golem, BlockPos pos) {
-		BlockState state = level.getBlockState(pos);
-		for (ItemStack drop : Block.getDrops(state, level, pos, null, golem, ItemStack.EMPTY)) {
-			GolemInventory.addOrDrop(golem, level, drop);
-		}
-	}
-
 	protected static double speed(CopperGolem golem) {
 		return BASE_SPEED * WorkSpeed.multiplier(golem);
 	}
@@ -300,6 +316,10 @@ public abstract class TaskWorker {
 		return Optional.ofNullable(best);
 	}
 
+	protected boolean isSkipped(BlockPos pos) {
+		return skipped.containsKey(pos);
+	}
+
 	private static boolean isWithinReach(CopperGolem golem, BlockPos pos, double reach) {
 		Vec3 center = Vec3.atBottomCenterOf(pos);
 		double dx = golem.getX() - center.x;
@@ -307,17 +327,62 @@ public abstract class TaskWorker {
 		return dx * dx + dz * dz <= reach * reach && Math.abs(golem.getY() - center.y) <= 2.0;
 	}
 
-	// ---- Depositing ----
+	/** Leaves that grew naturally (player-placed leaves are "persistent"). */
+	protected static boolean isNaturalLeaves(BlockState state) {
+		return state.getBlock() instanceof LeavesBlock
+			&& state.hasProperty(LeavesBlock.PERSISTENT) && !state.getValue(LeavesBlock.PERSISTENT);
+	}
 
-	private Optional<Job> depositJob(ServerLevel level, CopperGolem golem, GolemTask task) {
+	/** Puts a block's drops into the golem's bag (overflow is dropped on the ground). */
+	protected static void collectDrops(ServerLevel level, CopperGolem golem, BlockPos pos) {
+		BlockState state = level.getBlockState(pos);
+		for (ItemStack drop : Block.getDrops(state, level, pos, null, golem, ItemStack.EMPTY)) {
+			GolemInventory.addOrDrop(golem, level, drop);
+		}
+	}
+
+	/** The tool the golem holds, if it's one this task can use; otherwise empty. */
+	protected ItemStack tool(CopperGolem golem) {
+		ItemStack held = golem.getMainHandItem();
+		return wantsTool(held) ? held : ItemStack.EMPTY;
+	}
+
+	/** Wears down the golem's tool; it breaks (with the usual sound) when used up. */
+	protected static void damageTool(CopperGolem golem, int amount) {
+		if (!golem.getMainHandItem().isEmpty() && golem.getMainHandItem().isDamageableItem()) {
+			golem.getMainHandItem().hurtAndBreak(amount, golem, EquipmentSlot.MAINHAND);
+		}
+	}
+
+	/** Bag slot holding bone meal, or -1. */
+	protected int boneMealSlot(CopperGolem golem) {
+		if (!usesBoneMeal() || GolemInventory.isEmpty(golem)) {
+			return -1;
+		}
+		SimpleContainer bag = GolemInventory.get(golem);
+		for (int i = 0; i < bag.getContainerSize(); i++) {
+			if (bag.getItem(i).is(Items.BONE_MEAL)) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	// ---- Chests: depositing and restocking ----
+
+	/** Walk to the nearest chest matching {@code wanted}, drop off items and pick up supplies. */
+	private Optional<Job> chestJob(ServerLevel level, CopperGolem golem, GolemTask task, Predicate<Container> wanted) {
 		BlockPos anchor = task.anchor();
 		int radius = GolemTask.horizontalRadius() + CHEST_SEARCH_EXTRA;
 		Iterable<BlockPos> positions = BlockPos.betweenClosed(
 			anchor.offset(-radius, -GolemTask.VERTICAL_RADIUS, -radius),
 			anchor.offset(radius, GolemTask.VERTICAL_RADIUS, radius));
-		return findNearest(golem, positions, pos -> getChest(level, pos) != null).map(chestPos -> new Job(
-			chestPos, CHEST_REACH, DEPOSIT_DURATION,
-			() -> startDeposit(level, golem, chestPos),
+		return findNearest(golem, positions, pos -> {
+			Container chest = getChest(level, pos);
+			return chest != null && wanted.test(chest);
+		}).map(chestPos -> new Job(
+			Activity.DEPOSITING, chestPos, CHEST_REACH, DEPOSIT_DURATION,
+			() -> visitChest(level, golem, chestPos),
 			tick -> {
 				if (tick == DEPOSIT_SOUND_TICK) {
 					// Same timing as the vanilla golem's item drop-off sound.
@@ -338,7 +403,7 @@ public abstract class TaskWorker {
 		return null;
 	}
 
-	private boolean startDeposit(ServerLevel level, CopperGolem golem, BlockPos chestPos) {
+	private boolean visitChest(ServerLevel level, CopperGolem golem, BlockPos chestPos) {
 		Container chest = getChest(level, chestPos);
 		if (chest == null) {
 			skip(level, chestPos);
@@ -349,6 +414,17 @@ public abstract class TaskWorker {
 		golem.setOpenedChestPos(chestPos);
 		golem.setState(CopperGolemState.DROPPING_ITEM);
 
+		boolean chestFull = deposit(golem, chest);
+		restock(golem, chest);
+		chest.setChanged();
+		if (chestFull) {
+			skip(level, chestPos); // try a different chest for a while
+		}
+		return true;
+	}
+
+	/** Moves everything except kept items into the chest. Returns true if something didn't fit. */
+	private boolean deposit(CopperGolem golem, Container chest) {
 		boolean chestFull = false;
 		SimpleContainer bag = GolemInventory.get(golem);
 		Map<Item, Integer> kept = new HashMap<>();
@@ -367,10 +443,71 @@ public abstract class TaskWorker {
 			chestFull |= !remainder.isEmpty();
 		}
 		bag.setChanged();
-		if (chestFull) {
-			skip(level, chestPos); // try a different chest for a while
+		return chestFull;
+	}
+
+	/** Takes a tool (if the golem has none) and bone meal (up to the kept amount) from the chest. */
+	private void restock(CopperGolem golem, Container chest) {
+		if (tool(golem).isEmpty()) {
+			for (int i = 0; i < chest.getContainerSize(); i++) {
+				ItemStack stack = chest.getItem(i);
+				if (wantsTool(stack)) {
+					ItemStack held = golem.getMainHandItem();
+					golem.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, stack.split(1));
+					if (!held.isEmpty()) {
+						// Whatever it was holding goes into the chest (or back to the bag if full).
+						ItemStack remainder = HopperBlockEntity.addItem(null, chest, held, null);
+						if (!remainder.isEmpty()) {
+							GolemInventory.get(golem).addItem(remainder);
+						}
+					}
+					break;
+				}
+			}
 		}
-		return true;
+		if (usesBoneMeal()) {
+			int need = KEEP_AMOUNT - countInBag(golem, Items.BONE_MEAL);
+			for (int i = 0; i < chest.getContainerSize() && need > 0; i++) {
+				ItemStack stack = chest.getItem(i);
+				if (stack.is(Items.BONE_MEAL)) {
+					ItemStack taken = stack.split(Math.min(need, stack.getCount()));
+					need -= taken.getCount();
+					ItemStack remainder = GolemInventory.get(golem).addItem(taken);
+					stack.grow(remainder.getCount());
+					need = remainder.isEmpty() ? need : 0;
+				}
+			}
+		}
+	}
+
+	/** Whether the golem is missing a tool or bone meal that this chest has. */
+	private boolean hasNeededSupplies(CopperGolem golem, Container chest) {
+		boolean needsTool = tool(golem).isEmpty();
+		boolean needsBoneMeal = usesBoneMeal() && countInBag(golem, Items.BONE_MEAL) < KEEP_AMOUNT
+			&& GolemInventory.get(golem).canAddItem(new ItemStack(Items.BONE_MEAL));
+		if (!needsTool && !needsBoneMeal) {
+			return false;
+		}
+		for (int i = 0; i < chest.getContainerSize(); i++) {
+			ItemStack stack = chest.getItem(i);
+			if ((needsTool && wantsTool(stack)) || (needsBoneMeal && stack.is(Items.BONE_MEAL))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static int countInBag(CopperGolem golem, Item item) {
+		if (GolemInventory.isEmpty(golem)) {
+			return 0;
+		}
+		int count = 0;
+		for (ItemStack stack : GolemInventory.get(golem).getItems()) {
+			if (stack.is(item)) {
+				count += stack.getCount();
+			}
+		}
+		return count;
 	}
 
 	/** Whether the bag holds anything beyond the items this task keeps for itself. */

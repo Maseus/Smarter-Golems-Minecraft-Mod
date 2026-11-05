@@ -2,7 +2,10 @@
 	"required": true,
 	"package": "com.smartergolems.client.mixin",
 	"compatibilityLevel": "JAVA_25",
-	"client": [],
+	"client": [
+		"EntityRendererMixin",
+		"MobRendererMixin"
+	],
 	"injectors": {
 		"defaultRequire": 1
 	},

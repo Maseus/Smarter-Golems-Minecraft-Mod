@@ -66,7 +66,13 @@ public abstract class CopperGolemMixin implements WorkingGolem {
 
 	@Inject(method = "dropEquipment", at = @At("HEAD"))
 	private void smartergolems$dropCarriedOnDeath(ServerLevel level, CallbackInfo ci) {
-		GolemInventory.dropAll((CopperGolem) (Object) this, level);
+		CopperGolem golem = (CopperGolem) (Object) this;
+		GolemInventory.dropAll(golem, level);
+		// Mobs only drop held items by chance; a working golem's tool should always come back.
+		if (GolemTasks.get(golem).isPresent() && !golem.getMainHandItem().isEmpty()) {
+			golem.spawnAtLocation(level, golem.getMainHandItem());
+			golem.setItemInHand(InteractionHand.MAIN_HAND, net.minecraft.world.item.ItemStack.EMPTY);
+		}
 	}
 
 	@Inject(method = "turnToStatue", at = @At("HEAD"))

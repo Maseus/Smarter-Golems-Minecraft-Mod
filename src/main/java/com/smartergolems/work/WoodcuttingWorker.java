@@ -21,7 +21,9 @@ import net.minecraft.tags.ItemTags;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.animal.golem.CopperGolem;
 import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.BoneMealItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.SaplingBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
 import org.jspecify.annotations.Nullable;
@@ -37,6 +39,8 @@ import org.jspecify.annotations.Nullable;
 public class WoodcuttingWorker extends TaskWorker {
 	private static final double TREE_REACH = 2.0;
 	private static final int CHOP_TICKS = 60;
+	private static final int MIN_CHOP_TICKS = 8;
+	private static final double SAPLING_REACH = 1.5;
 	private static final int CHOP_HIT_INTERVAL = 10;
 	/** How far (horizontally) from its base a tree's logs and leaves may spread. */
 	private static final int MAX_TREE_SPREAD = 8;
@@ -57,7 +61,7 @@ public class WoodcuttingWorker extends TaskWorker {
 		while (true) {
 			Optional<BlockPos> candidate = findNearest(golem, task.areaPositions(), pos -> isTrunkBase(level, pos));
 			if (candidate.isEmpty()) {
-				return Optional.empty();
+				return fertilizeJob(level, golem, task);
 			}
 			BlockPos base = candidate.get();
 			if (scanTree(level, base) != null) {
@@ -67,14 +71,49 @@ public class WoodcuttingWorker extends TaskWorker {
 		}
 	}
 
+	/** With bone meal in the bag: help saplings in the area grow. */
+	private Optional<Job> fertilizeJob(ServerLevel level, CopperGolem golem, GolemTask task) {
+		if (boneMealSlot(golem) < 0) {
+			return Optional.empty();
+		}
+		return findNearest(golem, task.areaPositions(), pos -> level.getBlockState(pos).getBlock() instanceof SaplingBlock)
+			.map(pos -> Job.instant(Activity.FERTILIZING, pos, SAPLING_REACH, () -> {
+				int slot = boneMealSlot(golem);
+				if (slot >= 0 && level.getBlockState(pos).getBlock() instanceof SaplingBlock
+					&& BoneMealItem.growCrop(GolemInventory.get(golem).getItem(slot), level, pos)) {
+					GolemInventory.get(golem).setChanged();
+					level.levelEvent(1505, pos, 15); // bone meal particles
+				}
+			}));
+	}
+
 	/** Keep some saplings for replanting, in case a felled tree's leaves drop none. */
 	@Override
 	protected int amountToKeep(ItemStack stack) {
-		return stack.is(ItemTags.SAPLINGS) ? KEEP_AMOUNT : 0;
+		return stack.is(ItemTags.SAPLINGS) ? KEEP_AMOUNT : super.amountToKeep(stack);
+	}
+
+	@Override
+	public boolean wantsTool(ItemStack stack) {
+		return stack.is(ItemTags.AXES);
+	}
+
+	@Override
+	protected boolean usesBoneMeal() {
+		return true;
+	}
+
+	/**
+	 * Chopping time: 60 ticks bare-handed, faster with a better axe
+	 * (wood 40, stone 24, iron ~17, diamond ~13, gold ~9).
+	 */
+	private int chopTicks(CopperGolem golem, BlockState log) {
+		float speed = tool(golem).isEmpty() ? 1.0F : Math.max(1.0F, tool(golem).getDestroySpeed(log));
+		return Math.max(MIN_CHOP_TICKS, Math.round(CHOP_TICKS * 2 / (1 + speed)));
 	}
 
 	private Job chopJob(ServerLevel level, CopperGolem golem, BlockPos base) {
-		return new Job(base, TREE_REACH, CHOP_TICKS,
+		return new Job(Activity.CHOPPING, base, TREE_REACH, chopTicks(golem, level.getBlockState(base)),
 			() -> isTrunkBase(level, base),
 			tick -> {
 				if (tick % CHOP_HIT_INTERVAL == 0) {
@@ -107,6 +146,7 @@ public class WoodcuttingWorker extends TaskWorker {
 			collectDrops(level, golem, pos);
 			level.destroyBlock(pos, false, golem);
 		}
+		damageTool(golem, tree.logs().size()); // like a player: one durability per log
 		for (BlockPos pos : tree.leaves()) {
 			collectDrops(level, golem, pos);
 			level.removeBlock(pos, false);
