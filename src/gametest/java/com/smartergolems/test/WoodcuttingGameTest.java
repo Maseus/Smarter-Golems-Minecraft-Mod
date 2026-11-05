@@ -47,6 +47,60 @@ public class WoodcuttingGameTest {
 		});
 	}
 
+	/** A trunk fully walled in by natural leaves (like a dense forest) is still reached and felled. */
+	@GameTest(maxTicks = 1200, padding = TestUtil.PADDING)
+	public void pushesThroughLeaves(GameTestHelper helper) {
+		buildFloor(helper);
+		buildOakTree(helper);
+		// A 2-high ring of natural leaves hugging the trunk, so there's no path to it. The leaves touch the
+		// trunk so they don't decay during the test (natural leaves far from logs decay on random ticks).
+		BlockState leaves = naturalLeaves();
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				if (dx != 0 || dz != 0) {
+					helper.setBlock(TRUNK_BASE.offset(dx, 0, dz), leaves);
+					helper.setBlock(TRUNK_BASE.offset(dx, 1, dz), leaves);
+				}
+			}
+		}
+		CopperGolem golem = spawnWoodcutter(helper);
+		GolemInventory.get(golem).addItem(new ItemStack(Items.OAK_SAPLING));
+
+		helper.succeedWhen(() -> {
+			helper.assertBlockPresent(Blocks.OAK_SAPLING, TRUNK_BASE);
+			helper.assertBlockPresent(Blocks.AIR, TRUNK_BASE.above());
+		});
+	}
+
+	/** Player-placed (persistent) leaves are never broken, even when they block the way. */
+	@GameTest(maxTicks = 400, padding = TestUtil.PADDING)
+	public void leavesPlacedLeavesAlone(GameTestHelper helper) {
+		buildFloor(helper);
+		buildOakTree(helper);
+		BlockState hedge = Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
+		for (int dx = -2; dx <= 2; dx++) {
+			for (int dz = -2; dz <= 2; dz++) {
+				if (Math.max(Math.abs(dx), Math.abs(dz)) == 2) {
+					helper.setBlock(TRUNK_BASE.offset(dx, 0, dz), hedge);
+					helper.setBlock(TRUNK_BASE.offset(dx, 1, dz), hedge);
+				}
+			}
+		}
+		spawnWoodcutter(helper);
+
+		helper.runAtTickTime(300, () -> {
+			for (int dx = -2; dx <= 2; dx++) {
+				for (int dz = -2; dz <= 2; dz++) {
+					if (Math.max(Math.abs(dx), Math.abs(dz)) == 2) {
+						helper.assertBlockPresent(Blocks.OAK_LEAVES, TRUNK_BASE.offset(dx, 0, dz));
+						helper.assertBlockPresent(Blocks.OAK_LEAVES, TRUNK_BASE.offset(dx, 1, dz));
+					}
+				}
+			}
+			helper.succeed();
+		});
+	}
+
 	/** Logs without natural leaves (like a player's house) are never cut. */
 	@GameTest(maxTicks = 400, padding = TestUtil.PADDING)
 	public void leavesBuildsAlone(GameTestHelper helper) {

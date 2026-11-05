@@ -22,8 +22,6 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.animal.golem.CopperGolem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
 import org.jspecify.annotations.Nullable;
@@ -115,13 +113,6 @@ public class WoodcuttingWorker extends TaskWorker {
 		}
 		for (BlockPos stump : tree.stumps()) {
 			replant(level, golem, stump, logId);
-		}
-	}
-
-	private static void collectDrops(ServerLevel level, CopperGolem golem, BlockPos pos) {
-		BlockState state = level.getBlockState(pos);
-		for (ItemStack drop : Block.getDrops(state, level, pos, null, golem, ItemStack.EMPTY)) {
-			GolemInventory.addOrDrop(golem, level, drop);
 		}
 	}
 
@@ -222,11 +213,6 @@ public class WoodcuttingWorker extends TaskWorker {
 
 	private static boolean isStripped(BlockState state) {
 		return BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath().startsWith("stripped_");
-	}
-
-	private static boolean isNaturalLeaves(BlockState state) {
-		return state.getBlock() instanceof LeavesBlock
-			&& state.hasProperty(LeavesBlock.PERSISTENT) && !state.getValue(LeavesBlock.PERSISTENT);
 	}
 
 	private static boolean withinSpread(BlockPos base, BlockPos pos) {

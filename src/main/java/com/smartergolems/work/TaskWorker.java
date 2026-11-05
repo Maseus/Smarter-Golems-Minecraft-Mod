@@ -18,11 +18,16 @@ import net.minecraft.world.entity.animal.golem.CopperGolem;
 import net.minecraft.world.entity.animal.golem.CopperGolemState;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.util.Mth;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.entity.HopperBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.pathfinder.Path;
+import net.minecraft.world.level.pathfinder.PathType;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
@@ -57,6 +62,11 @@ public abstract class TaskWorker {
 	private static final int IDLE_SCAN_COOLDOWN = 40;
 	private static final int DEPOSIT_DURATION = 20;
 	private static final int DEPOSIT_SOUND_TICK = 9;
+	/**
+	 * Pathfinding cost of walking through leaves while working (vanilla: impassable). High enough
+	 * that open routes are preferred, but the golem will push through leaves when it has to.
+	 */
+	private static final float LEAVES_PATH_COST = 8.0F;
 
 	/**
 	 * One unit of work: walk to {@code target}, run {@code onArrive} (return false to abort,
@@ -98,6 +108,10 @@ public abstract class TaskWorker {
 
 	public final void tick(ServerLevel level, CopperGolem golem, GolemTask task) {
 		ticksInPhase++;
+		golem.setPathfindingMalus(PathType.LEAVES, LEAVES_PATH_COST);
+		if ((phase == Phase.MOVING || phase == Phase.RETURNING) && golem.horizontalCollision) {
+			clearLeavesInTheWay(level, golem);
+		}
 		switch (phase) {
 			case IDLE -> tickIdle(level, golem, task);
 			case MOVING -> tickMoving(level, golem);
@@ -109,6 +123,7 @@ public abstract class TaskWorker {
 	/** Stops whatever the golem is doing, e.g. when its task changes. */
 	public void reset(ServerLevel level, CopperGolem golem) {
 		closeChest(level, golem);
+		golem.setPathfindingMalus(PathType.LEAVES, PathType.LEAVES.getMalus());
 		golem.getNavigation().stop();
 		golem.setState(CopperGolemState.IDLE);
 		setPhase(Phase.IDLE, null);
@@ -221,7 +236,38 @@ public abstract class TaskWorker {
 		pathFailures = 0;
 	}
 
+	/**
+	 * Breaks natural leaves the golem is walking into, like a ravager does, keeping the drops.
+	 * Only beside and above the golem (not below, so it doesn't dig down), and never
+	 * player-placed (persistent) leaves.
+	 */
+	private static void clearLeavesInTheWay(ServerLevel level, CopperGolem golem) {
+		AABB box = golem.getBoundingBox().inflate(0.2, 0.0, 0.2);
+		for (BlockPos pos : BlockPos.betweenClosed(
+			Mth.floor(box.minX), Mth.floor(box.minY), Mth.floor(box.minZ),
+			Mth.floor(box.maxX), Mth.floor(box.maxY), Mth.floor(box.maxZ))) {
+			if (isNaturalLeaves(level.getBlockState(pos))) {
+				collectDrops(level, golem, pos);
+				level.destroyBlock(pos, false, golem);
+			}
+		}
+	}
+
 	// ---- Helpers for subclasses ----
+
+	/** Leaves that grew naturally (player-placed leaves are "persistent"). */
+	protected static boolean isNaturalLeaves(BlockState state) {
+		return state.getBlock() instanceof LeavesBlock
+			&& state.hasProperty(LeavesBlock.PERSISTENT) && !state.getValue(LeavesBlock.PERSISTENT);
+	}
+
+	/** Puts a block's drops into the golem's bag (overflow is dropped on the ground). */
+	protected static void collectDrops(ServerLevel level, CopperGolem golem, BlockPos pos) {
+		BlockState state = level.getBlockState(pos);
+		for (ItemStack drop : Block.getDrops(state, level, pos, null, golem, ItemStack.EMPTY)) {
+			GolemInventory.addOrDrop(golem, level, drop);
+		}
+	}
 
 	protected static double speed(CopperGolem golem) {
 		return BASE_SPEED * WorkSpeed.multiplier(golem);

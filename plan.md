@@ -17,6 +17,7 @@ Copper golems are built the vanilla way (carved pumpkin on a copper block).
 - Finds the nearest tree in the area, chops for ~3s, then fells the whole tree (logs + natural leaves) into its bag.
 - Replants a matching sapling on the stump (oak_log → oak_sapling, else any sapling); keeps up to 16 saplings per kind for this.
 - Never cuts builds: a "tree" must have natural (non-persistent) leaves, no stripped logs, and a base of at most a 2x2 trunk on dirt/grass.
+- Pushes through natural leaves blocking its way (breaks them like a ravager, keeps the drops); player-placed leaves are never broken.
 
 ## Oxidation
 - Work speed (walking + work durations) scales with oxidation: unaffected 100%, exposed 85%, weathered 70%, oxidized 55%.
