@@ -6,10 +6,12 @@ import com.smartergolems.task.GolemTask;
 import com.smartergolems.task.GolemTaskType;
 import com.smartergolems.task.GolemTasks;
 import com.smartergolems.task.TaughtBlock;
+import com.smartergolems.task.TaughtUse;
 import java.util.List;
 import java.util.Optional;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
@@ -17,9 +19,14 @@ import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.animal.golem.CopperGolem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.alchemy.PotionContents;
+import net.minecraft.world.item.alchemy.Potions;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 
 /** Tests for the custom task: teaching by example and mining the taught blocks. */
 public class CustomGameTest {
@@ -118,6 +125,129 @@ public class CustomGameTest {
 		helper.assertValueEqual(task.anchor(), golem.blockPosition(), "anchor");
 		helper.assertTrue(!GolemInteraction.tryFinishTeaching(golem, player, InteractionHand.MAIN_HAND), "Teaching should be over");
 		helper.succeed();
+	}
+
+	/**
+	 * Teaching right-clicks: placing a block (the spot in front of the clicked face changes), using
+	 * a water bottle on dirt (the clicked block changes) and filling a bucket at a water source
+	 * (a use in the air, aimed by where the player looks). Opening a chest changes nothing and
+	 * isn't recorded.
+	 */
+	@GameTest(padding = TestUtil.PADDING)
+	public void teachingRecordsRightClicks(GameTestHelper helper) {
+		floor(helper);
+		ServerPlayer player = helper.makeMockServerPlayerInLevel();
+		CopperGolem golem = helper.spawn(EntityTypes.COPPER_GOLEM, GOLEM);
+		BlockPos support = new BlockPos(3, 1, 3);
+		BlockPos spot = support.above();
+		BlockPos water = new BlockPos(5, 0, 5);
+		BlockPos chest = new BlockPos(6, 1, 1);
+		helper.setBlock(support, Blocks.STONE);
+		helper.setBlock(water, Blocks.WATER);
+		helper.setBlock(chest, Blocks.CHEST);
+		GolemInteraction.applyTask(golem, player, Optional.of(GolemTaskType.CUSTOM));
+
+		// Place dirt on top of the stone.
+		clickTop(helper, player, support, new ItemStack(Items.DIRT));
+		helper.assertBlockPresent(Blocks.DIRT, spot);
+		// Water bottle on the dirt: mud.
+		clickTop(helper, player, spot, waterBottle());
+		helper.assertBlockPresent(Blocks.MUD, spot);
+		// Open the chest: nothing changes.
+		clickTop(helper, player, chest, ItemStack.EMPTY);
+		// Bucket at the water, looking straight down at it.
+		Vec3 above = Vec3.atBottomCenterOf(helper.absolutePos(water.above()));
+		player.snapTo(above.x, above.y, above.z, 0.0F, 90.0F);
+		player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.BUCKET));
+		player.gameMode.useItem(player, helper.getLevel(), player.getMainHandItem(), InteractionHand.MAIN_HAND);
+		helper.assertBlockPresent(Blocks.AIR, water);
+
+		player.setShiftKeyDown(true);
+		helper.assertTrue(GolemInteraction.tryFinishTeaching(golem, player, InteractionHand.MAIN_HAND), "Sneak + right-click should finish teaching");
+		List<TaughtUse> uses = GolemTasks.get(golem).orElseThrow().uses();
+		helper.assertValueEqual(uses.size(), 3, "taught right-clicks");
+		assertUse(helper, uses.get(0), spot, Blocks.AIR.defaultBlockState(), Items.DIRT, true);
+		assertUse(helper, uses.get(1), spot, Blocks.DIRT.defaultBlockState(), Items.POTION, true);
+		helper.assertTrue(PotionContents.createItemStack(Items.POTION, Potions.WATER).getComponents().equals(uses.get(1).item().getComponents()),
+			"The water bottle should be remembered as a water bottle, not just any potion");
+		assertUse(helper, uses.get(2), water, Blocks.WATER.defaultBlockState(), Items.BUCKET, false);
+		helper.succeed();
+	}
+
+	/**
+	 * A whole clay-farm cycle: mine the clay, place dirt from the chest, make it mud with a water
+	 * bottle from the chest, then wait (the empty bottle and the clay go into the chest).
+	 */
+	@GameTest(maxTicks = 1200, padding = TestUtil.PADDING)
+	public void clayFarmCycle(GameTestHelper helper) {
+		floor(helper);
+		helper.setBlock(CHEST, Blocks.CHEST);
+		ChestBlockEntity chest = helper.getBlockEntity(CHEST, ChestBlockEntity.class);
+		chest.setItem(0, new ItemStack(Items.DIRT, 4));
+		chest.setItem(1, waterBottle());
+		chest.setItem(2, waterBottle());
+		BlockPos support = new BlockPos(4, 1, 4);
+		BlockPos spot = support.above();
+		helper.setBlock(support, Blocks.STONE);
+		helper.setBlock(spot, Blocks.CLAY);
+		BlockPos absSupport = helper.absolutePos(support);
+		BlockPos absSpot = helper.absolutePos(spot);
+		Vec3 stand = Vec3.atBottomCenterOf(helper.absolutePos(new BlockPos(4, 1, 2)));
+		List<TaughtBlock> mine = List.of(new TaughtBlock(absSpot, Blocks.CLAY));
+		List<TaughtUse> uses = List.of(
+			new TaughtUse(absSpot, Blocks.AIR.defaultBlockState(), new ItemStack(Items.DIRT), true,
+				absSupport, Direction.UP, Vec3.atCenterOf(absSupport).add(0, 0.5, 0), stand, 0.0F, 45.0F),
+			new TaughtUse(absSpot, Blocks.DIRT.defaultBlockState(), waterBottle(), true,
+				absSpot, Direction.UP, Vec3.atCenterOf(absSpot).add(0, 0.5, 0), stand, 0.0F, 45.0F));
+		CopperGolem golem = helper.spawn(EntityTypes.COPPER_GOLEM, GOLEM);
+		GolemTasks.set(golem, new GolemTask(GolemTaskType.CUSTOM, golem.blockPosition(), Optional.empty(), "", mine, uses));
+
+		helper.succeedWhen(() -> {
+			helper.assertBlockPresent(Blocks.MUD, spot);
+			helper.assertTrue(chest.countItem(Items.CLAY_BALL) == 4, "Expected 4 clay balls in the chest, found " + chest.countItem(Items.CLAY_BALL));
+			helper.assertTrue(chest.countItem(Items.GLASS_BOTTLE) == 1, "The empty bottle should be in the chest");
+			helper.assertTrue(GolemInventory.get(golem).countItem(Items.DIRT) == 3, "Golem should keep the rest of the dirt");
+			helper.assertTrue(GolemInventory.get(golem).countItem(Items.POTION) == 1, "Golem should keep the other water bottle");
+		});
+	}
+
+	/** A use in the air is aimed like the player aimed it: fill a bucket from the chest at a water source. */
+	@GameTest(maxTicks = 800, padding = TestUtil.PADDING)
+	public void fillsBucketAtWater(GameTestHelper helper) {
+		floor(helper);
+		helper.setBlock(CHEST, Blocks.CHEST);
+		ChestBlockEntity chest = helper.getBlockEntity(CHEST, ChestBlockEntity.class);
+		chest.setItem(0, new ItemStack(Items.BUCKET));
+		BlockPos water = new BlockPos(4, 0, 4);
+		helper.setBlock(water, Blocks.WATER);
+		BlockPos abs = helper.absolutePos(water);
+		TaughtUse fill = new TaughtUse(abs, Blocks.WATER.defaultBlockState(), new ItemStack(Items.BUCKET), false,
+			abs, Direction.UP, Vec3.atCenterOf(abs), Vec3.atBottomCenterOf(abs.above()), 0.0F, 90.0F);
+		CopperGolem golem = helper.spawn(EntityTypes.COPPER_GOLEM, GOLEM);
+		GolemTasks.set(golem, new GolemTask(GolemTaskType.CUSTOM, golem.blockPosition(), Optional.empty(), "", List.of(), List.of(fill)));
+
+		helper.succeedWhen(() -> {
+			helper.assertBlockNotPresent(Blocks.WATER, water);
+			helper.assertTrue(chest.countItem(Items.WATER_BUCKET) == 1, "The water bucket should end up in the chest");
+		});
+	}
+
+	private static void clickTop(GameTestHelper helper, ServerPlayer player, BlockPos pos, ItemStack item) {
+		BlockPos abs = helper.absolutePos(pos);
+		player.setItemInHand(InteractionHand.MAIN_HAND, item);
+		player.gameMode.useItemOn(player, helper.getLevel(), player.getMainHandItem(), InteractionHand.MAIN_HAND,
+			new BlockHitResult(Vec3.atCenterOf(abs).add(0, 0.5, 0), Direction.UP, abs, false));
+	}
+
+	private static void assertUse(GameTestHelper helper, TaughtUse use, BlockPos pos, BlockState before, net.minecraft.world.item.Item item, boolean onBlock) {
+		helper.assertValueEqual(use.pos(), helper.absolutePos(pos), "taught spot");
+		helper.assertValueEqual(use.before(), before, "condition at " + pos);
+		helper.assertTrue(use.item().is(item), "Expected " + item + ", taught " + use.item());
+		helper.assertValueEqual(use.onBlock(), onBlock, "click on a block");
+	}
+
+	private static ItemStack waterBottle() {
+		return PotionContents.createItemStack(Items.POTION, Potions.WATER);
 	}
 
 	private static List<TaughtBlock> taught(GameTestHelper helper, Block block, BlockPos... positions) {

@@ -27,13 +27,14 @@ Copper golems are built the vanilla way (carved pumpkin on a copper block).
 ## Task: Collecting
 - Picks up dropped items lying in the work area (e.g. under a mob farm) and deposits them into a chest.
 
-## Task: Custom (taught by example) — break rules done (10a), place/use planned (10b)
-- **Teach** button in the task menu puts the player in recording mode for that golem (action-bar counter, ~2 min timeout, sneak + right-click the golem to finish). Recorded spots get particle markers. Max ~16 rules, all within the golem's area.
+## Task: Custom (taught by example) — done (10a + 10b)
+- **Teach** button in the task menu puts the player in recording mode for that golem (action-bar counter, ends after 5 min without a new step, sneak + right-click the golem to finish). Recorded spots get particle markers. Max 16 steps, all within the golem's area.
 - Each recorded action becomes a **rule**: *when the block at P is X, do A*. A is one of:
   - **Break** P (cobble/stone/basalt generators, clay, concrete, amethyst…).
   - **Place** item I at P (condition: P is air/replaceable), e.g. dirt.
   - **Use** item I on P, e.g. water bottle on dirt → mud, bucket on a water source.
-- Recording works by diffing the block before/after the player's break / place / use (Fabric `PlayerBlockBreakEvents.AFTER`, plus a hook around item use on blocks/fluids), so it doesn't need per-item code.
+- Recording works by diffing the block before/after the player's break / place / use (Fabric `PlayerBlockBreakEvents.AFTER`, plus a mixin around `ServerPlayerGameMode.useItemOn`/`useItem`), so it doesn't need per-item code. Breaks match the block type; right-clicks match the exact block state.
+- Replay: right-clicks go through a Fabric `FakePlayer` placed where the teacher stood, with their look angles, so placement facing and aiming at fluids work like the player's click.
 - Golem loop: find the first rule whose condition matches the world and whose item is available (bag or supply chest) → do it. No rule matches → wait (e.g. mud drying into clay over pointed dripstone). Stateless, so it survives reloads.
 - Supplies: items used by rules are fetched from the supply chest (keep up to 16 each); leftovers (empty bottles/buckets) and drops are deposited. Recording "fill bottle at water source" makes the golem refill its own bottles.
 - Tools: takes the correct tool for each recorded break (pickaxe, shovel, axe…); drops follow vanilla tool rules; tools wear out.
@@ -60,7 +61,7 @@ Copper golems are built the vanilla way (carved pumpkin on a copper block).
 7. **Woodcutting + oxidation slowdown**: shared `TaskWorker` base for all tasks; game tests cover felling/replanting and that pillars and log walls are never cut. ✅
 8. **Leaves**: push through natural leaves. ✅
 9. **Bag GUI, more crops, tools, bone meal, collecting, status display, owner lock**: covered by game tests (16 total).
-10. **Custom task**: (a) Teach mode + break rules (cobblestone generator) ✅ (3 game tests); (b) place/use rules and item supplies (clay farm).
+10. **Custom task**: (a) Teach mode + break rules (cobblestone generator) ✅; (b) place/use rules and item supplies (clay farm) ✅. 6 game tests.
 
 ## Open questions (later)
 - Future tasks: e.g. animal keeping, sorting with item-frame filters, guarding, mining.

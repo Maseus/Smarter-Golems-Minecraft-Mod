@@ -7,7 +7,7 @@ import net.minecraft.network.codec.StreamCodec;
 
 /** What a working golem is doing right now; shown above its head. */
 public enum Activity {
-	IDLE, HARVESTING, PLANTING, TILLING, FERTILIZING, CHOPPING, COLLECTING, DEPOSITING, RETURNING, MINING;
+	IDLE, HARVESTING, PLANTING, TILLING, FERTILIZING, CHOPPING, COLLECTING, DEPOSITING, RETURNING, MINING, PLACING, USING;
 
 	public static final StreamCodec<ByteBuf, Activity> STREAM_CODEC = ByteBufCodecs.idMapper(
 		id -> id >= 0 && id < values().length ? values()[id] : IDLE, Activity::ordinal);

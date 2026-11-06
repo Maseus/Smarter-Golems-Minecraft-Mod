@@ -16,9 +16,11 @@ import net.minecraft.core.UUIDUtil;
  * @param anchor    center of the work area: where the golem stood when the task was assigned
  * @param owner     the player who assigned the task; only they (or operators) can change it
  * @param ownerName the owner's name when the task was assigned, for display
- * @param taught    blocks the player showed the golem (custom task only; empty otherwise)
+ * @param taught    blocks the player showed the golem to mine (custom task only; empty otherwise)
+ * @param uses      right-clicks the player showed the golem (custom task only; empty otherwise)
  */
-public record GolemTask(GolemTaskType type, BlockPos anchor, Optional<UUID> owner, String ownerName, List<TaughtBlock> taught) {
+public record GolemTask(GolemTaskType type, BlockPos anchor, Optional<UUID> owner, String ownerName,
+                        List<TaughtBlock> taught, List<TaughtUse> uses) {
 	/** Blocks above/below the anchor that still count, so slightly uneven farms work. */
 	public static final int VERTICAL_RADIUS = 2;
 
@@ -28,16 +30,29 @@ public record GolemTask(GolemTaskType type, BlockPos anchor, Optional<UUID> owne
 		// Optional so tasks saved before owners existed still load (as unowned).
 		UUIDUtil.CODEC.optionalFieldOf("owner").forGetter(GolemTask::owner),
 		Codec.STRING.optionalFieldOf("owner_name", "").forGetter(GolemTask::ownerName),
-		TaughtBlock.CODEC.listOf().optionalFieldOf("taught", List.of()).forGetter(GolemTask::taught)
+		TaughtBlock.CODEC.listOf().optionalFieldOf("taught", List.of()).forGetter(GolemTask::taught),
+		TaughtUse.CODEC.listOf().optionalFieldOf("uses", List.of()).forGetter(GolemTask::uses)
 	).apply(instance, GolemTask::new));
 
 	public GolemTask {
 		taught = List.copyOf(taught);
+		uses = List.copyOf(uses);
 	}
 
-	/** A task without taught blocks (every task except custom). */
+	/** A custom task that only mines. */
+	public GolemTask(GolemTaskType type, BlockPos anchor, Optional<UUID> owner, String ownerName, List<TaughtBlock> taught) {
+		this(type, anchor, owner, ownerName, taught, List.of());
+	}
+
+	/** A task without anything taught (every task except custom). */
 	public GolemTask(GolemTaskType type, BlockPos anchor, Optional<UUID> owner, String ownerName) {
 		this(type, anchor, owner, ownerName, List.of());
+	}
+
+	/** Every spot a custom task works on (to mark them in the task screen). */
+	public List<BlockPos> taughtPositions() {
+		return java.util.stream.Stream.concat(taught.stream().map(TaughtBlock::pos), uses.stream().map(TaughtUse::pos))
+			.distinct().toList();
 	}
 
 	/** An unowned task (anyone may change it). */

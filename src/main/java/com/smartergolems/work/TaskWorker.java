@@ -39,7 +39,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Shared logic for a golem doing a task: walking to jobs, giving up on unreachable spots,
- * depositing carried items into chests (and restocking tools / bone meal from them) and
+ * depositing carried items into chests (and restocking tools and supplies from them) and
  * returning home. Runs on the server every tick instead of the golem's vanilla brain.
  * Subclasses only decide what work to look for.
  *
@@ -47,7 +47,7 @@ import org.jspecify.annotations.Nullable;
  * 1. Deposit into a chest when the bag is getting full.
  * 2. The task's own work ({@link #findWork}).
  * 3. Deposit whatever is left when there's nothing else to do.
- * 4. Fetch missing supplies (tool, bone meal) from a chest that has them.
+ * 4. Fetch missing supplies (tool, bone meal, items a custom task uses) from a chest that has them.
  * 5. Walk back to the middle of the work area.
  *
  * State is not saved: after a reload the golem simply picks its next job again.
@@ -121,12 +121,37 @@ public abstract class TaskWorker {
 		return false;
 	}
 
+	private static final List<ItemStack> BONE_MEAL_SUPPLY = List.of(new ItemStack(Items.BONE_MEAL));
+
+	/**
+	 * Items this task takes from chests and keeps in its bag, as one-item samples: bone meal for
+	 * tasks that use it, whatever a custom task was taught to use.
+	 */
+	protected List<ItemStack> supplies() {
+		return usesBoneMeal() ? BONE_MEAL_SUPPLY : List.of();
+	}
+
+	/** Whether a stack is the same kind of item as a supply sample; wear on tools doesn't matter. */
+	public static boolean matchesSupply(ItemStack stack, ItemStack sample) {
+		return sample.isDamageableItem() ? ItemStack.isSameItem(stack, sample) : ItemStack.isSameItemSameComponents(stack, sample);
+	}
+
+	/** How many of a supply to keep: 16, or fewer of items that don't stack that far (one bucket). */
+	protected static int keepAmount(ItemStack sample) {
+		return Math.min(KEEP_AMOUNT, sample.getMaxStackSize());
+	}
+
 	/**
 	 * How many of this item to hold back when depositing, e.g. seeds or saplings needed for
-	 * replanting. The total kept per item type is capped at this amount.
+	 * replanting, or supplies. The total kept per item type is capped at this amount.
 	 */
 	protected int amountToKeep(ItemStack stack) {
-		return usesBoneMeal() && stack.is(Items.BONE_MEAL) ? KEEP_AMOUNT : 0;
+		for (ItemStack sample : supplies()) {
+			if (matchesSupply(stack, sample)) {
+				return keepAmount(sample);
+			}
+		}
+		return 0;
 	}
 
 	/** Called at the start of every tick with the golem's current task, before any other hook. */
@@ -477,7 +502,7 @@ public abstract class TaskWorker {
 		return chestFull;
 	}
 
-	/** Takes a tool (if the golem has none) and bone meal (up to the kept amount) from the chest. */
+	/** Takes a tool (if the golem has none) and supplies (up to the kept amount) from the chest. */
 	private void restock(ServerLevel level, CopperGolem golem, Container chest) {
 		if (needsTool(golem)) {
 			for (int i = 0; i < chest.getContainerSize(); i++) {
@@ -496,11 +521,11 @@ public abstract class TaskWorker {
 				}
 			}
 		}
-		if (usesBoneMeal()) {
-			int need = KEEP_AMOUNT - countInBag(golem, Items.BONE_MEAL);
+		for (ItemStack sample : supplies()) {
+			int need = keepAmount(sample) - countInBag(golem, sample);
 			for (int i = 0; i < chest.getContainerSize() && need > 0; i++) {
 				ItemStack stack = chest.getItem(i);
-				if (stack.is(Items.BONE_MEAL)) {
+				if (!stack.isEmpty() && matchesSupply(stack, sample)) {
 					ItemStack taken = stack.split(Math.min(need, stack.getCount()));
 					need -= taken.getCount();
 					ItemStack remainder = GolemInventory.get(golem).addItem(taken);
@@ -515,39 +540,49 @@ public abstract class TaskWorker {
 		return usesTool() && tool(golem).isEmpty();
 	}
 
-	private boolean needsBoneMeal(CopperGolem golem) {
-		return usesBoneMeal() && countInBag(golem, Items.BONE_MEAL) < KEEP_AMOUNT
-			&& GolemInventory.get(golem).canAddItem(new ItemStack(Items.BONE_MEAL));
+	/** Supplies the golem has fewer of than it keeps, and has room for. */
+	private List<ItemStack> missingSupplies(CopperGolem golem) {
+		List<ItemStack> missing = new ArrayList<>();
+		for (ItemStack sample : supplies()) {
+			if (countInBag(golem, sample) < keepAmount(sample) && GolemInventory.get(golem).canAddItem(sample)) {
+				missing.add(sample);
+			}
+		}
+		return missing;
 	}
 
-	/** Whether the golem is missing a tool or bone meal (cheap: doesn't look at any chest). */
+	/** Whether the golem is missing a tool or supplies (cheap: doesn't look at any chest). */
 	private boolean needsSupplies(CopperGolem golem) {
-		return needsTool(golem) || needsBoneMeal(golem);
+		return needsTool(golem) || !missingSupplies(golem).isEmpty();
 	}
 
-	/** Whether the golem is missing a tool or bone meal that this chest has. */
+	/** Whether the golem is missing a tool or supplies that this chest has. */
 	private boolean hasNeededSupplies(CopperGolem golem, Container chest) {
 		boolean needsTool = needsTool(golem);
-		boolean needsBoneMeal = needsBoneMeal(golem);
-		if (!needsTool && !needsBoneMeal) {
+		List<ItemStack> missing = missingSupplies(golem);
+		if (!needsTool && missing.isEmpty()) {
 			return false;
 		}
 		for (int i = 0; i < chest.getContainerSize(); i++) {
 			ItemStack stack = chest.getItem(i);
-			if ((needsTool && wantsTool(stack)) || (needsBoneMeal && stack.is(Items.BONE_MEAL))) {
+			if (stack.isEmpty()) {
+				continue;
+			}
+			if ((needsTool && wantsTool(stack)) || missing.stream().anyMatch(sample -> matchesSupply(stack, sample))) {
 				return true;
 			}
 		}
 		return false;
 	}
 
-	private static int countInBag(CopperGolem golem, Item item) {
+	/** How many items matching a supply sample the bag holds. */
+	protected static int countInBag(CopperGolem golem, ItemStack sample) {
 		if (GolemInventory.isEmpty(golem)) {
 			return 0;
 		}
 		int count = 0;
 		for (ItemStack stack : GolemInventory.get(golem).getItems()) {
-			if (stack.is(item)) {
+			if (!stack.isEmpty() && matchesSupply(stack, sample)) {
 				count += stack.getCount();
 			}
 		}

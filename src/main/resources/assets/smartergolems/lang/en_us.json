@@ -29,12 +29,14 @@
 	"task.smartergolems.custom": "Custom",
 	"screen.smartergolems.teach": "Custom: teach by example",
 	"activity.smartergolems.mining": "Mining",
-	"message.smartergolems.teach_start": "Teaching: break the blocks this golem should mine, then sneak + right-click it",
-	"message.smartergolems.teach_progress": "Teaching: %s/%s blocks · sneak + right-click the golem when done",
+	"message.smartergolems.teach_start": "Teaching: break, place and use items as the golem should, then sneak + right-click it",
+	"message.smartergolems.teach_progress": "Teaching: %s/%s steps · sneak + right-click the golem when done",
 	"message.smartergolems.teach_too_far": "Too far: taught blocks must be in the %sx%s area around the golem",
 	"message.smartergolems.teach_not_allowed": "The golem can't be taught that block",
-	"message.smartergolems.teach_full": "Already %s blocks taught: sneak + right-click the golem to finish",
+	"message.smartergolems.teach_full": "Already %s steps taught: sneak + right-click the golem to finish",
 	"message.smartergolems.teach_timeout": "Teaching timed out",
 	"message.smartergolems.teach_nothing": "Nothing taught: the golem's task is unchanged",
-	"message.smartergolems.custom_set": "Custom task: mining %s taught blocks (%sx%s area)"
+	"message.smartergolems.custom_set": "Custom task: %s taught steps (%sx%s area)",
+	"activity.smartergolems.placing": "Placing",
+	"activity.smartergolems.using": "Using items"
 }

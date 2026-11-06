@@ -5,6 +5,7 @@ import com.smartergolems.task.GolemTask;
 import com.smartergolems.task.GolemTaskType;
 import com.smartergolems.task.GolemTasks;
 import com.smartergolems.task.TaughtBlock;
+import com.smartergolems.task.TaughtUse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -79,7 +80,7 @@ public final class GolemInteraction {
 			golem.getId(), current.map(GolemTask::type), current.map(GolemTask::anchor),
 			current.map(GolemTask::radius).orElse(GolemTask.radiusFor(GolemTaskType.WOODCUTTING)),
 			bag, golem.getMainHandItem().copy(), current.map(GolemTask::ownerName).orElse(""), canEdit(golem, player),
-			current.map(task -> task.taught().stream().map(TaughtBlock::pos).toList()).orElse(List.of())));
+			current.map(GolemTask::taughtPositions).orElse(List.of())));
 	}
 
 	/**
@@ -141,19 +142,19 @@ public final class GolemInteraction {
 		sparkle(golem, level);
 	}
 
-	/** Server side: teaching finished; give the golem a custom task mining the taught blocks. */
-	public static void applyCustomTask(CopperGolem golem, ServerPlayer player, BlockPos anchor, List<TaughtBlock> taught) {
+	/** Server side: teaching finished; give the golem a custom task doing what it was shown. */
+	public static void applyCustomTask(CopperGolem golem, ServerPlayer player, BlockPos anchor, List<TaughtBlock> taught, List<TaughtUse> uses) {
 		if (!checkCanEdit(golem, player)) {
 			return;
 		}
 		ServerLevel level = player.level();
 		stopCurrentWork(golem, level);
-		GolemTask task = new GolemTask(GolemTaskType.CUSTOM, anchor, Optional.of(player.getUUID()), player.getPlainTextName(), taught);
+		GolemTask task = new GolemTask(GolemTaskType.CUSTOM, anchor, Optional.of(player.getUUID()), player.getPlainTextName(), taught, uses);
 		// Set the task first, so the worker knows the taught blocks when judging the held tool.
 		GolemTasks.set(golem, task);
 		stashUnusableHeldItem(golem, level, GolemTaskType.CUSTOM);
 		int size = task.areaSize();
-		player.sendOverlayMessage(Component.translatable("message.smartergolems.custom_set", taught.size(), size, size));
+		player.sendOverlayMessage(Component.translatable("message.smartergolems.custom_set", taught.size() + uses.size(), size, size));
 		sparkle(golem, level);
 	}
 

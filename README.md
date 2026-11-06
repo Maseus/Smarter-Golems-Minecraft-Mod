@@ -2,7 +2,7 @@
 
 # Smarter Golems
 
-Give your copper golems real jobs. Sneak + right-click a copper golem to make it a **farmer**, a **woodcutter** or a **collector**, or teach it a **custom** job by showing it what to mine. It works the area around it and puts what it gathers into a chest.
+Give your copper golems real jobs. Sneak + right-click a copper golem to make it a **farmer**, a **woodcutter** or a **collector**, or teach it a **custom** job by showing it what to do. It works the area around it and puts what it gathers into a chest.
 
 Built for **Minecraft 26.3** with **Fabric**.
 
@@ -45,16 +45,28 @@ Choose **No task** to give a golem its vanilla behavior back. Anything still in 
 - Picks up items lying on the ground in its area, such as under a mob farm, and puts them in the chest.
 
 ### Custom: teach by example
-Show the golem which blocks to mine, for example the output of a **cobblestone generator**:
+Show the golem a job by doing it yourself: mining a **cobblestone generator**, or running a **clay farm**.
 
-1. Stand the golem near the spot and open its menu. Click **Custom: teach by example**.
-2. Break the blocks it should mine (up to 16, within the 15x15 area and 4 blocks up or down). Particles mark each one, and the action bar counts them.
-3. **Sneak + right-click the golem** to finish. This works whatever you're holding. Teaching times out after 3 minutes.
+1. Build the farm or generator first. Everything you do while teaching is recorded.
+2. Stand the golem near the spot and open its menu. Click **Custom: teach by example**.
+3. Do the job once, within the golem's 15x15 area (up to 4 blocks up or down):
+   - **Break** blocks it should mine.
+   - **Place** blocks it should place.
+   - **Right-click with items** it should use: a water bottle on dirt, a bucket at water, bone meal and so on.
 
-The golem then mines each taught spot whenever **the same block** is back there. It never touches other blocks, and if a spot ends up holding something else (say, obsidian instead of cobblestone), it's left alone. It waits next to a generator while it refills, and takes its haul to the chest once its bag fills up.
+   Particles mark each taught spot, and the action bar counts the steps (up to 16). Clicks that change nothing, like opening a chest, aren't recorded.
+4. **Sneak + right-click the golem** to finish. This works whatever you're holding. Teaching ends after 5 minutes without a new step.
+
+Each step is tied to one spot and remembers what that spot looked like when you did it. The golem repeats a step whenever the spot looks like that again:
+- **Mining:** whenever **the same block** is back. If a spot ends up holding something else (say, obsidian instead of cobblestone), it's left alone. The golem waits next to a generator while it refills.
+- **Placing and using items:** whenever the spot is **exactly** as it was. Place dirt where there was air, use the water bottle where there was dirt. The golem uses the item standing where you stood and looking where you looked, so it works like your own click.
+
+So the steps of a cycle happen in the right order by themselves, and **you can teach them in any order**. For a clay farm (dirt on a block above pointed dripstone), you don't have to wait for the mud to dry: put a clay block on the spot before teaching, then break the clay, place dirt and use a water bottle on it. The golem then places dirt, makes mud, waits for the dripstone to turn it into clay, mines the clay and starts over.
+
+- **Items come from the supply chest.** The golem keeps up to 16 of each item it was taught to use (one of each item that doesn't stack, like buckets). Leftovers such as empty bottles go into the chest with its haul.
 - **Drops follow vanilla tool rules.** Stone and ores need a **pickaxe** from the supply chest, and the golem won't mine them without one. Dirt, sand or clay can be dug by hand, and a shovel is faster.
 - Mining takes as long as it would for a player with the same tool (slower when oxidized).
-- Containers, spawners and unbreakable blocks can't be taught.
+- Containers, spawners and unbreakable blocks can't be taught to mine.
 
 ## Supplies: tools and bone meal
 

@@ -3,7 +3,8 @@
 	"package": "com.smartergolems.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
-		"CopperGolemMixin"
+		"CopperGolemMixin",
+		"ServerPlayerGameModeMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
