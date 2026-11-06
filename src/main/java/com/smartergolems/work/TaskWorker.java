@@ -154,8 +154,11 @@ public abstract class TaskWorker {
 		return 0;
 	}
 
-	/** Called at the start of every tick with the golem's current task, before any other hook. */
-	protected void prepare(GolemTask task) {}
+	/**
+	 * Called at the start of every tick with the golem's current task, before any other hook,
+	 * and when a task is assigned (so {@link #wantsTool} judges the held item by the new task).
+	 */
+	public void prepare(GolemTask task) {}
 
 	public final void tick(ServerLevel level, CopperGolem golem, GolemTask task) {
 		prepare(task);

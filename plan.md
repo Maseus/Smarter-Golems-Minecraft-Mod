@@ -64,4 +64,4 @@ Copper golems are built the vanilla way (carved pumpkin on a copper block).
 10. **Custom task**: (a) Teach mode + break rules (cobblestone generator) ✅; (b) place/use rules and item supplies (clay farm) ✅. 6 game tests.
 
 ## Open questions (later)
-- Future tasks: e.g. animal keeping, sorting with item-frame filters, guarding, mining.
+- Future tasks: e.g. animal keeping, sorting with item-frame filters, guarding.

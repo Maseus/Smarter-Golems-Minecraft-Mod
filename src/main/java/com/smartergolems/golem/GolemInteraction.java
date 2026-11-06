@@ -150,8 +150,9 @@ public final class GolemInteraction {
 		ServerLevel level = player.level();
 		stopCurrentWork(golem, level);
 		GolemTask task = new GolemTask(GolemTaskType.CUSTOM, anchor, Optional.of(player.getUUID()), player.getPlainTextName(), taught, uses);
-		// Set the task first, so the worker knows the taught blocks when judging the held tool.
 		GolemTasks.set(golem, task);
+		// Tell the worker what was taught, so it judges the held tool by the new taught blocks.
+		((WorkingGolem) golem).smartergolems$workerFor(GolemTaskType.CUSTOM).prepare(task);
 		stashUnusableHeldItem(golem, level, GolemTaskType.CUSTOM);
 		int size = task.areaSize();
 		player.sendOverlayMessage(Component.translatable("message.smartergolems.custom_set", taught.size() + uses.size(), size, size));

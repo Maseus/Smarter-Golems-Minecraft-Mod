@@ -1,5 +1,6 @@
 package com.smartergolems.work;
 
+import com.mojang.authlib.GameProfile;
 import com.smartergolems.golem.GolemInventory;
 import com.smartergolems.task.GolemTask;
 import com.smartergolems.task.TaughtBlock;
@@ -10,6 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import net.fabricmc.fabric.api.entity.FakePlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
@@ -25,6 +27,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Custom task, taught by example. The golem repeats what the player showed it:
@@ -52,15 +55,23 @@ public class CustomWorker extends TaskWorker {
 	private static final int REFILL_WAIT_TICKS = 200;
 	/** Length of one "wait for the block to come back" job; the golem checks again after it. */
 	private static final int WAIT_JOB_TICKS = 10;
+	/**
+	 * Our own fake player rather than Fabric's shared default one: its inventory is cleared
+	 * around every use, which must never touch another mod's items.
+	 */
+	private static final GameProfile FAKE_PLAYER_PROFILE = new GameProfile(
+		UUID.nameUUIDFromBytes("smartergolems:copper_golem".getBytes(java.nio.charset.StandardCharsets.UTF_8)), "[Copper Golem]");
 
 	private List<TaughtBlock> taught = List.of();
 	private List<TaughtUse> uses = List.of();
 	private List<ItemStack> supplies = List.of();
 	/** When each spot was last mined, to wait for it to refill. */
 	private final Map<BlockPos, Long> minedAt = new HashMap<>();
+	/** The block showing this golem's crack overlay, if it's mining one. */
+	private @Nullable BlockPos cracking;
 
 	@Override
-	protected void prepare(GolemTask task) {
+	public void prepare(GolemTask task) {
 		if (task.uses() != uses) {
 			// The items the taught right-clicks use, once each.
 			List<ItemStack> samples = new ArrayList<>();
@@ -78,6 +89,21 @@ public class CustomWorker extends TaskWorker {
 	@Override
 	protected List<ItemStack> supplies() {
 		return supplies;
+	}
+
+	/** Also forget recently mined spots (they may not be taught anymore) and clear any crack overlay. */
+	@Override
+	public void reset(ServerLevel level, CopperGolem golem) {
+		super.reset(level, golem);
+		minedAt.clear();
+		clearCracks(level, golem);
+	}
+
+	private void clearCracks(ServerLevel level, CopperGolem golem) {
+		if (cracking != null) {
+			level.destroyBlockProgress(golem.getId(), cracking, -1);
+			cracking = null;
+		}
 	}
 
 	@Override
@@ -171,13 +197,14 @@ public class CustomWorker extends TaskWorker {
 				// The crack overlay players see while mining, keyed to this golem.
 				int progress = Math.min(9, tick * 10 / Math.max(1, WorkSpeed.scaleTicks(golem, ticks)));
 				level.destroyBlockProgress(golem.getId(), pos, progress);
+				cracking = pos;
 			},
 			() -> mine(level, golem, spot));
 	}
 
 	private void mine(ServerLevel level, CopperGolem golem, TaughtBlock spot) {
 		BlockPos pos = spot.pos();
-		level.destroyBlockProgress(golem.getId(), pos, -1);
+		clearCracks(level, golem);
 		if (!canMine(level, golem, spot)) {
 			return; // changed while the golem was working on it
 		}
@@ -246,7 +273,7 @@ public class CustomWorker extends TaskWorker {
 		}
 		ItemStack given = item.copy();
 
-		FakePlayer player = FakePlayer.get(level);
+		FakePlayer player = FakePlayer.get(level, FAKE_PLAYER_PROFILE);
 		Inventory inventory = player.getInventory();
 		inventory.clearContent();
 		player.snapTo(step.from().x, step.from().y, step.from().z, step.yRot(), step.xRot());
