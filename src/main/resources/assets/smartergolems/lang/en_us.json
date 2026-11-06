@@ -12,7 +12,7 @@
 	"screen.smartergolems.owner": "Assigned by %s",
 	"screen.smartergolems.owner_locked": "Assigned by %s (locked)",
 	"screen.smartergolems.carrying": "Tool and carried items",
-	"screen.smartergolems.tool_slot": "Tool: put an axe (woodcutting) or hoe (farming) in its chest",
+	"screen.smartergolems.tool_slot": "Tool: put an axe (woodcutting), hoe (farming) or pickaxe/shovel (custom) in its chest",
 	"screen.smartergolems.take_items": "Take items",
 	"message.smartergolems.not_owner": "This golem works for %s",
 	"status.smartergolems.format": "%s · %s",
@@ -25,5 +25,16 @@
 	"activity.smartergolems.collecting": "Collecting",
 	"activity.smartergolems.depositing": "Depositing",
 	"activity.smartergolems.returning": "Returning",
-	"message.smartergolems.task_set_chest": "Task: %s (%sx%s around the chest at %s, %s, %s)"
+	"message.smartergolems.task_set_chest": "Task: %s (%sx%s around the chest at %s, %s, %s)",
+	"task.smartergolems.custom": "Custom",
+	"screen.smartergolems.teach": "Custom: teach by example",
+	"activity.smartergolems.mining": "Mining",
+	"message.smartergolems.teach_start": "Teaching: break the blocks this golem should mine, then sneak + right-click it",
+	"message.smartergolems.teach_progress": "Teaching: %s/%s blocks · sneak + right-click the golem when done",
+	"message.smartergolems.teach_too_far": "Too far: taught blocks must be in the %sx%s area around the golem",
+	"message.smartergolems.teach_not_allowed": "The golem can't be taught that block",
+	"message.smartergolems.teach_full": "Already %s blocks taught: sneak + right-click the golem to finish",
+	"message.smartergolems.teach_timeout": "Teaching timed out",
+	"message.smartergolems.teach_nothing": "Nothing taught: the golem's task is unchanged",
+	"message.smartergolems.custom_set": "Custom task: mining %s taught blocks (%sx%s area)"
 }

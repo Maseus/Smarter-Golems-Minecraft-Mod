@@ -3,6 +3,7 @@ package com.smartergolems.task;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.smartergolems.SmarterGolemsConfig;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -15,8 +16,9 @@ import net.minecraft.core.UUIDUtil;
  * @param anchor    center of the work area: where the golem stood when the task was assigned
  * @param owner     the player who assigned the task; only they (or operators) can change it
  * @param ownerName the owner's name when the task was assigned, for display
+ * @param taught    blocks the player showed the golem (custom task only; empty otherwise)
  */
-public record GolemTask(GolemTaskType type, BlockPos anchor, Optional<UUID> owner, String ownerName) {
+public record GolemTask(GolemTaskType type, BlockPos anchor, Optional<UUID> owner, String ownerName, List<TaughtBlock> taught) {
 	/** Blocks above/below the anchor that still count, so slightly uneven farms work. */
 	public static final int VERTICAL_RADIUS = 2;
 
@@ -25,8 +27,18 @@ public record GolemTask(GolemTaskType type, BlockPos anchor, Optional<UUID> owne
 		BlockPos.CODEC.fieldOf("anchor").forGetter(GolemTask::anchor),
 		// Optional so tasks saved before owners existed still load (as unowned).
 		UUIDUtil.CODEC.optionalFieldOf("owner").forGetter(GolemTask::owner),
-		Codec.STRING.optionalFieldOf("owner_name", "").forGetter(GolemTask::ownerName)
+		Codec.STRING.optionalFieldOf("owner_name", "").forGetter(GolemTask::ownerName),
+		TaughtBlock.CODEC.listOf().optionalFieldOf("taught", List.of()).forGetter(GolemTask::taught)
 	).apply(instance, GolemTask::new));
+
+	public GolemTask {
+		taught = List.copyOf(taught);
+	}
+
+	/** A task without taught blocks (every task except custom). */
+	public GolemTask(GolemTaskType type, BlockPos anchor, Optional<UUID> owner, String ownerName) {
+		this(type, anchor, owner, ownerName, List.of());
+	}
 
 	/** An unowned task (anyone may change it). */
 	public GolemTask(GolemTaskType type, BlockPos anchor) {

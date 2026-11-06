@@ -2,7 +2,7 @@
 
 # Smarter Golems
 
-Give your copper golems real jobs. Sneak + right-click a copper golem to make it a **farmer**, a **woodcutter** or a **collector**. It works the area around it and puts what it gathers into a chest.
+Give your copper golems real jobs. Sneak + right-click a copper golem to make it a **farmer**, a **woodcutter** or a **collector**, or teach it a **custom** job by showing it what to mine. It works the area around it and puts what it gathers into a chest.
 
 Built for **Minecraft 26.3** with **Fabric**.
 
@@ -14,7 +14,7 @@ Built for **Minecraft 26.3** with **Fabric**.
 2. Stand it where you want it to work, then **sneak + right-click it with an empty hand**.
 3. Pick a task. While the menu is open, particles outline the golem's work area.
    - **Farming** covers a **9x9 area**, the same reach as water hydrating farmland. It's centered on the **nearest chest**, so the classic layout just works: a **waterlogged chest** in the middle of a 9x9 farm. With no chest nearby, it centers on the golem.
-   - **Woodcutting and collecting** cover a **15x15 area** centered on where the golem stood.
+   - **Woodcutting, collecting and custom** cover a **15x15 area** centered on where the golem stood.
 4. Put a **chest** in or near the area (up to 4 blocks outside it). The golem drops its haul there.
 
 Choose **No task** to give a golem its vanilla behavior back. Anything still in its bag is dropped.
@@ -44,11 +44,23 @@ Choose **No task** to give a golem its vanilla behavior back. Anything still in 
 ### Collecting
 - Picks up items lying on the ground in its area, such as under a mob farm, and puts them in the chest.
 
+### Custom: teach by example
+Show the golem which blocks to mine, for example the output of a **cobblestone generator**:
+
+1. Stand the golem near the spot and open its menu. Click **Custom: teach by example**.
+2. Break the blocks it should mine (up to 16, within the 15x15 area and 4 blocks up or down). Particles mark each one, and the action bar counts them.
+3. **Sneak + right-click the golem** to finish. This works whatever you're holding. Teaching times out after 3 minutes.
+
+The golem then mines each taught spot whenever **the same block** is back there. It never touches other blocks, and if a spot ends up holding something else (say, obsidian instead of cobblestone), it's left alone. It waits next to a generator while it refills, and takes its haul to the chest once its bag fills up.
+- **Drops follow vanilla tool rules.** Stone and ores need a **pickaxe** from the supply chest, and the golem won't mine them without one. Dirt, sand or clay can be dug by hand, and a shovel is faster.
+- Mining takes as long as it would for a player with the same tool (slower when oxidized).
+- Containers, spawners and unbreakable blocks can't be taught.
+
 ## Supplies: tools and bone meal
 
 The chest a golem drops items into is also its **supply chest**. Put supplies in it and the golem takes what it needs:
 
-- **Hoe** for farmers, **axe** for woodcutters. The tool shows in the golem's hand and wears out with use. When it breaks, the golem grabs a new one on its next chest visit.
+- **Hoe** for farmers, **axe** for woodcutters, the right **pickaxe or shovel** for custom mining. The tool shows in the golem's hand and wears out with use. When it breaks, the golem grabs a new one on its next chest visit.
 - **Bone meal:** the golem carries up to 16.
 
 To take a tool back, right-click the golem **without** sneaking, the same as taking any item a copper golem is holding.

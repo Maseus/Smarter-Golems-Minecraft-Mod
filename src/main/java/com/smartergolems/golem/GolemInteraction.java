@@ -4,6 +4,7 @@ import com.smartergolems.network.OpenTaskScreenPayload;
 import com.smartergolems.task.GolemTask;
 import com.smartergolems.task.GolemTaskType;
 import com.smartergolems.task.GolemTasks;
+import com.smartergolems.task.TaughtBlock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -36,6 +37,19 @@ public final class GolemInteraction {
 			&& player.getItemInHand(hand).isEmpty();
 	}
 
+	/**
+	 * While teaching, sneak + right-clicking the golem being taught finishes teaching, whatever
+	 * the player holds (they are probably still holding a pickaxe). Server side only.
+	 */
+	public static boolean tryFinishTeaching(CopperGolem golem, Player player, InteractionHand hand) {
+		if (hand == InteractionHand.MAIN_HAND && player.isShiftKeyDown()
+			&& player instanceof ServerPlayer serverPlayer && Teaching.isTeaching(serverPlayer, golem)) {
+			Teaching.finish(golem, serverPlayer);
+			return true;
+		}
+		return false;
+	}
+
 	/** Called on both client and server; only the server acts, by telling the client to open the task screen. */
 	public static InteractionResult onTaskInteraction(CopperGolem golem, Player player) {
 		if (player instanceof ServerPlayer serverPlayer) {
@@ -64,7 +78,8 @@ public final class GolemInteraction {
 		ServerPlayNetworking.send(player, new OpenTaskScreenPayload(
 			golem.getId(), current.map(GolemTask::type), current.map(GolemTask::anchor),
 			current.map(GolemTask::radius).orElse(GolemTask.radiusFor(GolemTaskType.WOODCUTTING)),
-			bag, golem.getMainHandItem().copy(), current.map(GolemTask::ownerName).orElse(""), canEdit(golem, player)));
+			bag, golem.getMainHandItem().copy(), current.map(GolemTask::ownerName).orElse(""), canEdit(golem, player),
+			current.map(task -> task.taught().stream().map(TaughtBlock::pos).toList()).orElse(List.of())));
 	}
 
 	/**
@@ -88,15 +103,20 @@ public final class GolemInteraction {
 		return false;
 	}
 
-	/** Server side: apply the player's choice from the task screen. Empty means "No task". */
+	/**
+	 * Server side: apply the player's choice from the task screen. Empty means "No task". Custom
+	 * doesn't change the task yet: it starts teaching, and the task is set when teaching finishes.
+	 */
 	public static void applyTask(CopperGolem golem, ServerPlayer player, Optional<GolemTaskType> type) {
 		if (!checkCanEdit(golem, player)) {
 			return;
 		}
+		if (type.isPresent() && type.get() == GolemTaskType.CUSTOM) {
+			Teaching.start(golem, player);
+			return;
+		}
 		ServerLevel level = player.level();
-		// Stop whatever the golem was doing (vanilla chest sorting or a previous task) before switching.
-		((WorkingGolem) golem).smartergolems$resetWorker(level);
-		golem.getBrain().stopAll(level, golem);
+		stopCurrentWork(golem, level);
 
 		if (type.isEmpty()) {
 			GolemTasks.clear(golem);
@@ -107,12 +127,7 @@ public final class GolemInteraction {
 			player.sendOverlayMessage(Component.translatable("message.smartergolems.task_cleared"));
 			return;
 		}
-		// Something in its hand the new task can't use (vanilla cargo, or another task's tool) goes in the bag.
-		ItemStack held = golem.getMainHandItem();
-		if (!held.isEmpty() && !((WorkingGolem) golem).smartergolems$workerFor(type.get()).wantsTool(held)) {
-			golem.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
-			GolemInventory.addOrDrop(golem, level, held);
-		}
+		stashUnusableHeldItem(golem, level, type.get());
 		// Farming centers on the nearest chest (e.g. a waterlogged chest in the middle of a 9x9 farm);
 		// otherwise the area is centered where the golem stands. Picking a task again re-centers it.
 		Optional<BlockPos> chest = type.get() == GolemTaskType.FARMING ? findFarmChest(level, golem) : Optional.empty();
@@ -123,6 +138,41 @@ public final class GolemInteraction {
 		player.sendOverlayMessage(Component.translatable(
 			chest.isPresent() ? "message.smartergolems.task_set_chest" : "message.smartergolems.task_set",
 			task.type().displayName(), size, size, a.getX(), a.getY(), a.getZ()));
+		sparkle(golem, level);
+	}
+
+	/** Server side: teaching finished; give the golem a custom task mining the taught blocks. */
+	public static void applyCustomTask(CopperGolem golem, ServerPlayer player, BlockPos anchor, List<TaughtBlock> taught) {
+		if (!checkCanEdit(golem, player)) {
+			return;
+		}
+		ServerLevel level = player.level();
+		stopCurrentWork(golem, level);
+		GolemTask task = new GolemTask(GolemTaskType.CUSTOM, anchor, Optional.of(player.getUUID()), player.getPlainTextName(), taught);
+		// Set the task first, so the worker knows the taught blocks when judging the held tool.
+		GolemTasks.set(golem, task);
+		stashUnusableHeldItem(golem, level, GolemTaskType.CUSTOM);
+		int size = task.areaSize();
+		player.sendOverlayMessage(Component.translatable("message.smartergolems.custom_set", taught.size(), size, size));
+		sparkle(golem, level);
+	}
+
+	/** Stops whatever the golem was doing (vanilla chest sorting or a previous task) before switching. */
+	private static void stopCurrentWork(CopperGolem golem, ServerLevel level) {
+		((WorkingGolem) golem).smartergolems$resetWorker(level);
+		golem.getBrain().stopAll(level, golem);
+	}
+
+	/** Something in its hand the new task can't use (vanilla cargo, or another task's tool) goes in the bag. */
+	private static void stashUnusableHeldItem(CopperGolem golem, ServerLevel level, GolemTaskType type) {
+		ItemStack held = golem.getMainHandItem();
+		if (!held.isEmpty() && !((WorkingGolem) golem).smartergolems$workerFor(type).wantsTool(held)) {
+			golem.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+			GolemInventory.addOrDrop(golem, level, held);
+		}
+	}
+
+	private static void sparkle(CopperGolem golem, ServerLevel level) {
 		level.sendParticles(ParticleTypes.HAPPY_VILLAGER, golem.getX(), golem.getY() + 0.8, golem.getZ(), 10, 0.3, 0.3, 0.3, 0.0);
 	}
 

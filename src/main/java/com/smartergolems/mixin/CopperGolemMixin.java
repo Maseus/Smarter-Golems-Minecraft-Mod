@@ -48,13 +48,16 @@ public abstract class CopperGolemMixin implements WorkingGolem {
 	}
 
 	/**
-	 * Runs before vanilla's copper golem interaction. If the player is sneaking
-	 * with an empty main hand, we take over; otherwise vanilla behavior is untouched.
+	 * Runs before vanilla's copper golem interaction. If the player is sneaking with an empty
+	 * main hand (or with anything, to finish teaching), we take over; otherwise vanilla
+	 * behavior is untouched.
 	 */
 	@Inject(method = "mobInteract", at = @At("HEAD"), cancellable = true)
 	private void smartergolems$onInteract(Player player, InteractionHand hand, CallbackInfoReturnable<InteractionResult> cir) {
 		CopperGolem golem = (CopperGolem) (Object) this;
-		if (GolemInteraction.isTaskInteraction(player, hand)) {
+		if (GolemInteraction.tryFinishTeaching(golem, player, hand)) {
+			cir.setReturnValue(InteractionResult.SUCCESS);
+		} else if (GolemInteraction.isTaskInteraction(player, hand)) {
 			cir.setReturnValue(GolemInteraction.onTaskInteraction(golem, player));
 		}
 	}

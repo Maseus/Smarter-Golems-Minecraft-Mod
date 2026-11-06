@@ -2,6 +2,7 @@ package com.smartergolems;
 
 import com.smartergolems.golem.GolemInventory;
 import com.smartergolems.golem.GolemStatus;
+import com.smartergolems.golem.Teaching;
 import com.smartergolems.network.ModNetworking;
 import com.smartergolems.task.GolemTasks;
 import net.fabricmc.api.ModInitializer;
@@ -20,6 +21,7 @@ public class SmarterGolems implements ModInitializer {
 		GolemInventory.init();
 		GolemStatus.init();
 		ModNetworking.init();
+		Teaching.init();
 		LOGGER.info("Smarter Golems loaded");
 	}
 

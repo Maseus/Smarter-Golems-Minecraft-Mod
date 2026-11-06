@@ -21,9 +21,11 @@ import net.minecraft.world.item.ItemStack;
  * @param tool        the item in the golem's hand (its tool), possibly empty
  * @param ownerName   who assigned the current task ("" if nobody)
  * @param canEdit     whether this player may change the task or take items
+ * @param taught      blocks a custom task mines (empty for other tasks), marked while the screen is open
  */
 public record OpenTaskScreenPayload(int golemId, Optional<GolemTaskType> currentTask, Optional<BlockPos> anchor, int radius,
-                                    List<ItemStack> bag, ItemStack tool, String ownerName, boolean canEdit)
+                                    List<ItemStack> bag, ItemStack tool, String ownerName, boolean canEdit,
+                                    List<BlockPos> taught)
 	implements CustomPacketPayload {
 	public static final Type<OpenTaskScreenPayload> TYPE = new Type<>(SmarterGolems.id("open_task_screen"));
 	public static final StreamCodec<RegistryFriendlyByteBuf, OpenTaskScreenPayload> CODEC = StreamCodec.composite(
@@ -35,6 +37,7 @@ public record OpenTaskScreenPayload(int golemId, Optional<GolemTaskType> current
 		ItemStack.OPTIONAL_STREAM_CODEC, OpenTaskScreenPayload::tool,
 		ByteBufCodecs.STRING_UTF8, OpenTaskScreenPayload::ownerName,
 		ByteBufCodecs.BOOL, OpenTaskScreenPayload::canEdit,
+		BlockPos.STREAM_CODEC.apply(ByteBufCodecs.list()), OpenTaskScreenPayload::taught,
 		OpenTaskScreenPayload::new
 	);
 

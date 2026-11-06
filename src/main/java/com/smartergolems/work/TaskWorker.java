@@ -129,7 +129,11 @@ public abstract class TaskWorker {
 		return usesBoneMeal() && stack.is(Items.BONE_MEAL) ? KEEP_AMOUNT : 0;
 	}
 
+	/** Called at the start of every tick with the golem's current task, before any other hook. */
+	protected void prepare(GolemTask task) {}
+
 	public final void tick(ServerLevel level, CopperGolem golem, GolemTask task) {
+		prepare(task);
 		ticksInPhase++;
 		golem.setPathfindingMalus(PathType.LEAVES, LEAVES_PATH_COST);
 		// Sweet berry bushes would slowly hurt the golem to death; walk around them.

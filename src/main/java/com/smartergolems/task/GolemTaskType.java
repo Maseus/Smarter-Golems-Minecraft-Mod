@@ -2,6 +2,7 @@ package com.smartergolems.task;
 
 import com.mojang.serialization.Codec;
 import com.smartergolems.work.CollectingWorker;
+import com.smartergolems.work.CustomWorker;
 import com.smartergolems.work.FarmingWorker;
 import com.smartergolems.work.TaskWorker;
 import com.smartergolems.work.WoodcuttingWorker;
@@ -15,7 +16,9 @@ import net.minecraft.util.StringRepresentable;
 public enum GolemTaskType implements StringRepresentable {
 	FARMING("farming"),
 	WOODCUTTING("woodcutting"),
-	COLLECTING("collecting");
+	COLLECTING("collecting"),
+	/** Taught by example: mines the blocks the player showed it. */
+	CUSTOM("custom");
 
 	public static final Codec<GolemTaskType> CODEC = StringRepresentable.fromEnum(GolemTaskType::values);
 	public static final StreamCodec<ByteBuf, GolemTaskType> STREAM_CODEC = ByteBufCodecs.idMapper(GolemTaskType::byId, GolemTaskType::ordinal);
@@ -42,6 +45,7 @@ public enum GolemTaskType implements StringRepresentable {
 			case FARMING -> new FarmingWorker();
 			case WOODCUTTING -> new WoodcuttingWorker();
 			case COLLECTING -> new CollectingWorker();
+			case CUSTOM -> new CustomWorker();
 		};
 	}
 

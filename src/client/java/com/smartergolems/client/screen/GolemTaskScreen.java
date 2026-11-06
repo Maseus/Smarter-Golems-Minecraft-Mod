@@ -85,7 +85,9 @@ public class GolemTaskScreen extends Screen {
 		int x = (this.width - BUTTON_WIDTH) / 2;
 		int y = buttonsTop();
 		for (GolemTaskType type : GolemTaskType.values()) {
-			addTaskButton(type.displayName(), Optional.of(type), x, y);
+			// Custom doesn't switch right away: it starts teaching by example.
+			Component label = type == GolemTaskType.CUSTOM ? Component.translatable("screen.smartergolems.teach") : type.displayName();
+			addTaskButton(label, Optional.of(type), x, y);
 			y += BUTTON_SPACING;
 		}
 		addTaskButton(Component.translatable("task.smartergolems.none"), Optional.empty(), x, y);
@@ -119,6 +121,7 @@ public class GolemTaskScreen extends Screen {
 		if (ticks++ % OUTLINE_INTERVAL_TICKS == 0) {
 			BlockPos center = data.anchor().orElse(golem.blockPosition());
 			spawnOutline(center, data.anchor().isPresent() ? CURRENT_AREA : PREVIEW_AREA);
+			data.taught().forEach(this::spawnMarker);
 		}
 	}
 
@@ -139,6 +142,16 @@ public class GolemTaskScreen extends Screen {
 			this.minecraft.level.addParticle(particle, minX + d, y, maxZ, 0, 0, 0);
 			this.minecraft.level.addParticle(particle, minX, y, minZ + d, 0, 0, 0);
 			this.minecraft.level.addParticle(particle, maxX, y, minZ + d, 0, 0, 0);
+		}
+	}
+
+	/** Particles on the corners of a block a custom task mines. */
+	private void spawnMarker(BlockPos pos) {
+		for (int corner = 0; corner < 8; corner++) {
+			double x = pos.getX() + ((corner & 1) == 0 ? -0.05 : 1.05);
+			double y = pos.getY() + ((corner & 2) == 0 ? -0.05 : 1.05);
+			double z = pos.getZ() + ((corner & 4) == 0 ? -0.05 : 1.05);
+			this.minecraft.level.addParticle(CURRENT_AREA, x, y, z, 0, 0, 0);
 		}
 	}
 
